@@ -1,0 +1,40 @@
+{
+  "name": "nyanbar",
+  "version": "1.0.0",
+  "description": "🐱 NyanBar (Claude Code) — macOS menu bar app for monitoring Claude Code sessions",
+  "author": "UjiinEatingTangerines",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UjiinEatingTangerines/nyanbar.git"
+  },
+  "homepage": "https://github.com/UjiinEatingTangerines/nyanbar",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "menubar",
+    "macos",
+    "cat",
+    "nyanbar",
+    "monitor",
+    "notification"
+  ],
+  "bin": {
+    "nyanbar": "./bin/nyanbar.js"
+  },
+  "os": [
+    "darwin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/",
+    "Sources/",
+    "Hooks/",
+    "Package.swift",
+    "scripts/",
+    "LICENSE",
+    "README.md"
+  ]
+}

@@ -3,22 +3,12 @@
 macOS 메뉴바에서 Claude Code 세션을 모니터링하는 앱입니다.
 고양이빵(식빵고양이)이 메뉴바에 앉아서 Claude Code 작업 상태를 알려줍니다.
 
-![macOS](https://img.shields.io/badge/macOS-14.0+-blue) ![Swift](https://img.shields.io/badge/Swift-5.9+-orange) ![License](https://img.shields.io/badge/license-MIT-green)
+![macOS](https://img.shields.io/badge/macOS-14.0+-blue) ![Swift](https://img.shields.io/badge/Swift-5.9+-orange) ![npm](https://img.shields.io/npm/v/nyanbar) ![License](https://img.shields.io/badge/license-MIT-green)
 
-<!-- 메뉴바 미리보기 (스크린샷 추가 후 주석 해제)
+<!-- 스크린샷 추가 후 주석 해제
 ![Menu Bar Preview](assets/menubar-preview.png)
--->
-
-<!-- 대시보드 미리보기 (스크린샷 추가 후 주석 해제)
 ![Dashboard](assets/dashboard-preview.png)
--->
-
-<!-- 메뉴바 애니메이션 GIF (녹화 후 주석 해제)
-![Menu Bar Animation](assets/menubar-animation.gif)
--->
-
-<!-- 무지개 알림 GIF (녹화 후 주석 해제)
-![Rainbow Notification](assets/rainbow-animation.gif)
+![Animation](assets/menubar-animation.gif)
 -->
 
 ## Features
@@ -28,119 +18,86 @@ macOS 메뉴바에서 Claude Code 세션을 모니터링하는 앱입니다.
   - Working: 꼬리 활발히 흔들림 + 프로젝트명 표시
   - Completed: 무지개 고양이 + 화면 상단 무지개 오버레이
 - **세션 대시보드** — 클릭하면 모든 Claude Code 세션 목록 표시
-  - Working / Completed / Crashed / Idle 그룹별 정리
-  - 프로젝트명, 경로, 경과시간, 마지막 메시지 표시
-- **세션으로 이동** — 세션 카드 클릭 시 해당 터미널로 포커스 (cmux, iTerm2, Terminal.app 등)
+- **세션으로 이동** — 세션 카드 클릭 시 해당 터미널로 포커스
 - **무지개 알림** — 작업 완료 시 모든 모니터에 무지개 애니메이션 (확인할 때까지 지속)
-- **헬스체크** — 세션이 살아있는지 주기적으로 확인 (5분/30분/1시간 설정 가능)
-- **자동 시작** — LaunchAgent로 로그인 시 자동 실행
-- **멀티 터미널 지원** — cmux, iTerm2, Terminal.app, VS Code, Warp, Ghostty 등
+- **헬스체크** — 세션이 살아있는지 주기적으로 확인 (5분/30분/1시간)
+- **자동 시작** — 로그인 시 자동 실행
+- **멀티 터미널** — cmux, iTerm2, Terminal.app, VS Code, Warp, Ghostty
 
 ## Requirements
 
 - macOS 14.0 (Sonoma) 이상
-- [Claude Code CLI](https://claude.ai/code) 설치 필요
-- Swift 5.9+ (빌드 시)
+- Node.js 18+ (npm 설치 시)
+- [Claude Code CLI](https://claude.ai/code)
+
+---
 
 ## Installation
 
-### Quick Install (권장)
+### npm (권장) ⚡
 
 ```bash
-# 1. 클론
+npm install -g nyanbar
+nyanbar install
+```
+
+이 한 줄이면 끝! 빌드, 앱 설치, Hook 등록, LaunchAgent 설정까지 자동으로 완료됩니다.
+
+### npx (설치 없이 실행)
+
+```bash
+npx nyanbar install
+```
+
+### Git Clone
+
+```bash
 git clone https://github.com/UjiinEatingTangerines/nyanbar.git
 cd nyanbar
-
-# 2. 빌드 & 설치
-bash scripts/install.sh
+npm install
+nyanbar install
 ```
 
-### Manual Install
+---
+
+## Commands
 
 ```bash
-# 1. 빌드
-swift build -c release
-
-# 2. 앱 번들 생성
-bash scripts/build.sh
-
-# 3. Hook 스크립트 복사
-cp Hooks/menubar-session-update.js ~/.claude/scripts/hooks/
-
-# 4. Hook 등록 (아래 참조)
+nyanbar install     # 빌드 + 설치 + Hook 등록 + 자동시작 설정
+nyanbar uninstall   # 완전 제거 (앱, Hook, LaunchAgent, 세션 데이터)
+nyanbar start       # 앱 시작
+nyanbar stop        # 앱 종료
+nyanbar status      # 설치 상태 확인
+nyanbar help        # 도움말
 ```
 
-### Hook 등록
+### `nyanbar install` 이 하는 것
 
-`~/.claude/settings.json`의 `hooks` 객체에 아래 항목을 추가합니다.
-각 이벤트 배열에 기존 hook이 있다면 배열 끝에 추가합니다.
+1. ✅ Swift로 앱 빌드 (`swift build -c release`)
+2. ✅ `~/Applications/ClaudeMenuBar.app` 번들 생성
+3. ✅ Hook 스크립트를 `~/.claude/scripts/hooks/`에 복사
+4. ✅ `~/.claude/settings.json`에 4개 Hook 자동 등록
+5. ✅ LaunchAgent 설치 (로그인 시 자동 시작)
+6. ✅ 앱 실행
 
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [{
-          "type": "command",
-          "command": "_MENUBAR_EVENT=session-start node \"$CLAUDE_PLUGIN_ROOT/scripts/hooks/menubar-session-update.js\"",
-          "timeout": 5,
-          "async": true
-        }]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [{
-          "type": "command",
-          "command": "_MENUBAR_EVENT=tool-use node \"$CLAUDE_PLUGIN_ROOT/scripts/hooks/menubar-session-update.js\"",
-          "timeout": 5,
-          "async": true
-        }]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "*",
-        "hooks": [{
-          "type": "command",
-          "command": "_MENUBAR_EVENT=stop node \"$CLAUDE_PLUGIN_ROOT/scripts/hooks/menubar-session-update.js\"",
-          "timeout": 5,
-          "async": true
-        }]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "matcher": "*",
-        "hooks": [{
-          "type": "command",
-          "command": "_MENUBAR_EVENT=session-end node \"$CLAUDE_PLUGIN_ROOT/scripts/hooks/menubar-session-update.js\"",
-          "timeout": 5,
-          "async": true
-        }]
-      }
-    ]
-  }
-}
-```
+### `nyanbar uninstall` 이 하는 것
 
-### Auto-Start 설정
+1. 앱 종료
+2. LaunchAgent 제거
+3. 앱 번들 삭제
+4. Hook 스크립트 삭제
+5. `settings.json`에서 Hook 항목 제거
+6. 세션 데이터 삭제
 
-```bash
-# LaunchAgent 등록 (로그인 시 자동 시작)
-cp LaunchAgent/com.claudecode.menubar.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.claudecode.menubar.plist
-```
+---
 
 ## Usage
 
-1. 앱을 실행하면 메뉴바에 고양이빵 아이콘이 나타납니다
+1. 앱이 실행되면 메뉴바에 고양이빵 아이콘이 나타납니다
 2. Claude Code 세션을 시작하면 자동으로 감지됩니다
 3. 고양이 아이콘을 클릭하면 세션 대시보드가 열립니다
 4. 세션 카드를 클릭하면 해당 터미널로 이동합니다
-5. 작업이 완료되면 무지개 알림이 나타납니다 — 아이콘을 클릭하면 확인 처리됩니다
+5. 작업이 완료되면 무지개 알림 → 아이콘 클릭하면 확인 처리
 
 ### Menu Bar States
 
@@ -152,25 +109,9 @@ launchctl load ~/Library/LaunchAgents/com.claudecode.menubar.plist
 
 ### Spinner Messages (30종)
 
-고양이 일상과 한국 밈을 섞은 이모지 문구가 10초마다 랜덤 표시:
-
 > 🍞 빵 굽는 중.. · 🐾 꾹꾹이 하는 중.. · 😴 골골골.. · 💤 낮잠 모드.. · 👀 집사 감시 중.. · 😾 야옹 안 할거다냥 · 🏃 3초후 미친듯이 뜀 · 😸 집사 교육 95% · ...
 
-## Uninstall
-
-```bash
-bash scripts/uninstall.sh
-```
-
-또는 수동으로:
-```bash
-killall ClaudeMenuBar
-launchctl unload ~/Library/LaunchAgents/com.claudecode.menubar.plist
-rm ~/Library/LaunchAgents/com.claudecode.menubar.plist
-rm -rf ~/Applications/ClaudeMenuBar.app
-rm -rf ~/.claude/menubar-sessions
-rm ~/.claude/scripts/hooks/menubar-session-update.js
-```
+---
 
 ## Architecture
 
@@ -187,47 +128,34 @@ Claude Code Hooks ──write──→ ~/.claude/menubar-sessions/*.json
                (cat loaf 🍞)    (NSPopover)          (all screens 🌈)
 ```
 
-### Project Structure
+## Project Structure
 
 ```
 nyanbar/
-├── Package.swift
-├── Sources/ClaudeMenuBar/
-│   ├── ClaudeMenuBarApp.swift          # App entry point
-│   ├── AppDelegate.swift               # NSStatusItem + NSPopover
-│   ├── Core/
-│   │   ├── SessionState.swift          # Data model
-│   │   ├── SessionDirectoryWatcher.swift
-│   │   └── RelativeTimeFormatter.swift
-│   ├── Services/
-│   │   ├── MenuBarIconManager.swift    # Cat icon + animations
-│   │   ├── HealthCheckService.swift    # PID-based health check
-│   │   ├── SettingsStore.swift         # UserDefaults
-│   │   └── TerminalController.swift    # Terminal focus
-│   ├── Modules/
-│   │   ├── SessionDashboard/           # Session cards UI
-│   │   └── RainbowAnimation/           # Rainbow overlay
-│   └── Views/
-│       ├── PopoverContentView.swift
-│       └── SettingsView.swift
-├── Hooks/
-│   └── menubar-session-update.js       # Claude Code hook
-└── scripts/
-    ├── build.sh
-    ├── install.sh
-    └── uninstall.sh
+├── package.json              # npm package
+├── bin/nyanbar.js            # CLI (install/uninstall/start/stop/status)
+├── Package.swift             # Swift Package Manager
+├── Sources/ClaudeMenuBar/    # Swift app source
+│   ├── AppDelegate.swift
+│   ├── Core/                 # SessionState, Watcher, Formatter
+│   ├── Services/             # IconManager, HealthCheck, Settings, Terminal
+│   ├── Modules/              # SessionDashboard, RainbowAnimation
+│   └── Views/                # PopoverContent, Settings
+├── Hooks/                    # Claude Code hook script
+│   └── menubar-session-update.js
+└── scripts/                  # Shell scripts (build, install, uninstall)
 ```
 
 ## Supported Terminals
 
-| Terminal | Session Detection | Focus (click to jump) |
+| Terminal | Detection | Focus (click) |
 |----------|:-:|:-:|
-| cmux | ✅ | ✅ (panel-level) |
-| Ghostty | ✅ | ✅ (app-level) |
-| iTerm2 | ✅ | ✅ (app-level) |
-| Terminal.app | ✅ | ✅ (app-level) |
-| VS Code | ✅ | ✅ (app-level) |
-| Warp | ✅ | ✅ (app-level) |
+| cmux | ✅ | ✅ panel-level |
+| Ghostty | ✅ | ✅ |
+| iTerm2 | ✅ | ✅ |
+| Terminal.app | ✅ | ✅ |
+| VS Code | ✅ | ✅ |
+| Warp | ✅ | ✅ |
 
 ## License
 
