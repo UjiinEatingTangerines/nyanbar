@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/UjiinEatingTangerines/nyanbar.git"
+    "url": "git+https://github.com/UjiinEatingTangerines/nyanbar.git"
   },
   "homepage": "https://github.com/UjiinEatingTangerines/nyanbar",
   "keywords": [
@@ -20,7 +20,7 @@
     "notification"
   ],
   "bin": {
-    "nyanbar": "./bin/nyanbar.js"
+    "nyanbar": "bin/nyanbar.js"
   },
   "os": [
     "darwin"
