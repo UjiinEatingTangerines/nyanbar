@@ -5,6 +5,22 @@ macOS 메뉴바에서 Claude Code 세션을 모니터링하는 앱입니다.
 
 ![macOS](https://img.shields.io/badge/macOS-14.0+-blue) ![Swift](https://img.shields.io/badge/Swift-5.9+-orange) ![License](https://img.shields.io/badge/license-MIT-green)
 
+<!-- 메뉴바 미리보기 (스크린샷 추가 후 주석 해제)
+![Menu Bar Preview](assets/menubar-preview.png)
+-->
+
+<!-- 대시보드 미리보기 (스크린샷 추가 후 주석 해제)
+![Dashboard](assets/dashboard-preview.png)
+-->
+
+<!-- 메뉴바 애니메이션 GIF (녹화 후 주석 해제)
+![Menu Bar Animation](assets/menubar-animation.gif)
+-->
+
+<!-- 무지개 알림 GIF (녹화 후 주석 해제)
+![Rainbow Notification](assets/rainbow-animation.gif)
+-->
+
 ## Features
 
 - **메뉴바 고양이 아이콘** — 식빵고양이가 작업 상태를 표시
