@@ -26,12 +26,20 @@ struct SettingsView: View {
                             .font(.system(size: 11.5))
                             .foregroundStyle(.secondary)
 
-                        Picker("Interval", selection: $settings.selectedInterval) {
-                            ForEach(HealthCheckInterval.allCases) { interval in
-                                Text(interval.displayName).tag(interval)
+                        VStack(spacing: 6) {
+                            // Row 1: seconds
+                            HStack(spacing: 4) {
+                                ForEach([HealthCheckInterval.tenSeconds, .twentySeconds, .thirtySeconds], id: \.id) { interval in
+                                    intervalButton(interval)
+                                }
+                            }
+                            // Row 2: minutes/hours
+                            HStack(spacing: 4) {
+                                ForEach([HealthCheckInterval.fiveMinutes, .thirtyMinutes, .oneHour], id: \.id) { interval in
+                                    intervalButton(interval)
+                                }
                             }
                         }
-                        .pickerStyle(.segmented)
                         .onChange(of: settings.selectedInterval) { _, _ in
                             onReschedule()
                         }
@@ -84,6 +92,25 @@ struct SettingsView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
         }
+    }
+
+    @ViewBuilder
+    private func intervalButton(_ interval: HealthCheckInterval) -> some View {
+        let isSelected = settings.selectedInterval == interval
+        Button {
+            settings.selectedInterval = interval
+        } label: {
+            Text(interval.displayName)
+                .font(.system(size: 11, weight: isSelected ? .semibold : .regular, design: .monospaced))
+                .foregroundStyle(isSelected ? .primary : .secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.06))
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
