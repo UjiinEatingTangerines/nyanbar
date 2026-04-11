@@ -5,6 +5,8 @@ struct SettingsView: View {
     @StateObject private var updateChecker = UpdateChecker()
     var onReschedule: () -> Void
 
+    @State private var newSpinnerText = ""
+
     private var appVersion: String { UpdateChecker.currentVersion }
 
     var body: some View {
@@ -59,6 +61,179 @@ struct SettingsView: View {
                         HStack(spacing: 4) {
                             ForEach(AppLanguage.allCases) { lang in
                                 languageButton(lang)
+                            }
+                        }
+                    }
+                }
+
+                // Appearance
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: settings.appearance == "dark" ? "moon.stars.fill" : settings.appearance == "light" ? "sun.max.fill" : "circle.lefthalf.filled")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.purple)
+                            Text(settings.selectedLanguage.appearanceTitle)
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+
+                        HStack(spacing: 4) {
+                            appearanceButton("system", icon: "circle.lefthalf.filled", label: "System")
+                            appearanceButton("light", icon: "sun.max.fill", label: "Light")
+                            appearanceButton("dark", icon: "moon.fill", label: "Dark")
+                        }
+                    }
+                }
+
+                // Cat Color
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "paintpalette.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.pink)
+                            Text(settings.selectedLanguage.catColorTitle)
+                                .font(.system(size: 13, weight: .semibold))
+                            Spacer()
+                            if settings.catColorHex != nil {
+                                Button(settings.selectedLanguage.catColorReset) {
+                                    settings.catColorHex = nil
+                                }
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .buttonStyle(.plain)
+                            } else {
+                                Text(settings.selectedLanguage.catColorSystemDesc)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+
+                        // Color palette grid
+                        let palette: [(String, String)] = [
+                            ("#000000", "⬛"), ("#FFFFFF", "⬜"), ("#FF6B6B", "🔴"), ("#FF922B", "🟠"),
+                            ("#FFD43B", "🟡"), ("#51CF66", "🟢"), ("#339AF0", "🔵"), ("#845EF7", "🟣"),
+                            ("#F06595", "💗"), ("#20C997", "🩵"), ("#868E96", "🩶"), ("#C2255C", "🌹"),
+                        ]
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 6), spacing: 4) {
+                            ForEach(palette, id: \.0) { hex, _ in
+                                let isSelected = settings.catColorHex == hex
+                                Button {
+                                    settings.catColorHex = hex
+                                } label: {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color(nsColor: NSColor(hex: hex) ?? .black))
+                                        .frame(height: 24)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .stroke(isSelected ? Color.white : Color.clear, lineWidth: 2)
+                                        )
+                                        .overlay(
+                                            isSelected ? Image(systemName: "checkmark")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundStyle(.white.opacity(0.9)) : nil
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
+                // Sleep Mode + Sound
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        // Sleep mode toggle
+                        Toggle(isOn: $settings.sleepMode) {
+                            HStack(spacing: 6) {
+                                Image(systemName: settings.sleepMode ? "moon.fill" : "moon")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.indigo)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(settings.selectedLanguage.sleepModeTitle)
+                                        .font(.system(size: 13, weight: .semibold))
+                                    Text(settings.selectedLanguage.sleepModeDesc)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+
+                        Divider()
+
+                        // Sound toggle
+                        Toggle(isOn: $settings.soundEnabled) {
+                            HStack(spacing: 6) {
+                                Image(systemName: settings.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(settings.selectedLanguage.soundTitle)
+                                        .font(.system(size: 13, weight: .semibold))
+                                    Text(settings.selectedLanguage.soundDesc)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                    }
+                }
+
+                // Custom Spinner Messages
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "text.bubble")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.green)
+                            Text(settings.selectedLanguage.customSpinnerTitle)
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+
+                        Text(settings.selectedLanguage.customSpinnerDesc)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+
+                        // Input field
+                        HStack(spacing: 6) {
+                            TextField("🐱 새 문구...", text: $newSpinnerText)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 11))
+
+                            Button(settings.selectedLanguage.addMessage) {
+                                addCustomMessage()
+                            }
+                            .font(.system(size: 11, weight: .medium))
+                            .disabled(newSpinnerText.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+
+                        // List of custom messages
+                        if !settings.customSpinnerMessages.isEmpty {
+                            VStack(spacing: 4) {
+                                ForEach(settings.customSpinnerMessages, id: \.self) { msg in
+                                    HStack {
+                                        Text(msg)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Button {
+                                            removeCustomMessage(msg)
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.06)))
+                                }
                             }
                         }
                     }
@@ -242,6 +417,36 @@ struct SettingsView: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(isSelected ? Color.clear : Color.secondary.opacity(0.15), lineWidth: 1))
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func appearanceButton(_ value: String, icon: String, label: String) -> some View {
+        let isSelected = settings.appearance == value
+        Button { settings.appearance = value } label: {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                Text(label)
+                    .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+            }
+            .foregroundStyle(isSelected ? .white : .primary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 6).fill(isSelected ? Color.accentColor : Color(nsColor: .controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(isSelected ? Color.clear : Color.secondary.opacity(0.15), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func addCustomMessage() {
+        let msg = newSpinnerText.trimmingCharacters(in: .whitespaces)
+        guard !msg.isEmpty else { return }
+        settings.customSpinnerMessages.append(msg)
+        newSpinnerText = ""
+    }
+
+    private func removeCustomMessage(_ msg: String) {
+        settings.customSpinnerMessages.removeAll { $0 == msg }
     }
 
     @ViewBuilder

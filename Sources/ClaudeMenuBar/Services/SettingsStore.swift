@@ -35,6 +35,31 @@ final class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(selectedLanguage.rawValue, forKey: "appLanguage") }
     }
 
+    @Published var soundEnabled: Bool {
+        didSet { UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled") }
+    }
+
+    @Published var sleepMode: Bool {
+        didSet { UserDefaults.standard.set(sleepMode, forKey: "sleepMode") }
+    }
+
+    @Published var customSpinnerMessages: [String] {
+        didSet { UserDefaults.standard.set(customSpinnerMessages, forKey: "customSpinnerMessages") }
+    }
+
+    /// Appearance: "system", "light", "dark"
+    @Published var appearance: String {
+        didSet {
+            UserDefaults.standard.set(appearance, forKey: "appearance")
+            applyAppearance()
+        }
+    }
+
+    /// Cat icon color: nil = system template (auto), otherwise fixed hex color
+    @Published var catColorHex: String? {
+        didSet { UserDefaults.standard.set(catColorHex, forKey: "catColorHex") }
+    }
+
     var healthCheckSeconds: TimeInterval {
         selectedInterval.seconds
     }
@@ -45,5 +70,27 @@ final class SettingsStore: ObservableObject {
 
         let langRaw = UserDefaults.standard.string(forKey: "appLanguage") ?? "ko"
         self.selectedLanguage = AppLanguage(rawValue: langRaw) ?? .korean
+
+        self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
+        self.sleepMode = UserDefaults.standard.bool(forKey: "sleepMode")
+        self.customSpinnerMessages = UserDefaults.standard.stringArray(forKey: "customSpinnerMessages") ?? []
+        self.appearance = UserDefaults.standard.string(forKey: "appearance") ?? "system"
+        self.catColorHex = UserDefaults.standard.string(forKey: "catColorHex")
+
+        applyAppearance()
+    }
+
+    func applyAppearance() {
+        let newAppearance: NSAppearance? = switch appearance {
+        case "light": NSAppearance(named: .aqua)
+        case "dark": NSAppearance(named: .darkAqua)
+        default: nil
+        }
+
+        // Apply to app and all windows (including popover)
+        NSApp.appearance = newAppearance
+        for window in NSApp.windows {
+            window.appearance = newAppearance
+        }
     }
 }

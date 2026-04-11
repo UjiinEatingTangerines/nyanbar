@@ -109,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showPopover() {
         guard let button = statusItem.button else { return }
+        settings.applyAppearance() // Ensure popover uses correct appearance
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -172,9 +173,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Don't interrupt an active rainbow
         if iconManager.isShowingRainbow { return }
 
-        if !newlyCompleted.isEmpty {
+        if !newlyCompleted.isEmpty && !settings.sleepMode {
             iconManager.update(state: .completed)
             RainbowOverlayManager.shared.showRainbow()
+            if settings.soundEnabled {
+                SoundPlayer.playMeow()
+            }
             return
         }
 
@@ -183,8 +187,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateIconWithoutRainbow() {
         // Priority: working > unacknowledged pending > idle
+        if settings.sleepMode {
+            iconManager.update(state: .idle)
+            return
+        }
+
         if let latest = watcher.workingSessions.first {
-            // New working session clears acknowledged state
             acknowledgedPendingIds.remove(latest.sessionId)
             iconManager.update(state: .working(projectName: latest.displayProjectName))
         } else if let pending = watcher.pendingSessions.first(where: { !acknowledgedPendingIds.contains($0.sessionId) }) {

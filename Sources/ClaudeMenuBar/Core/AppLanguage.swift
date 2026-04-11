@@ -83,6 +83,40 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
     var aboutTitle: String { "About" }
 
+    var sleepModeTitle: String {
+        switch self { case .korean: "수면 모드"; case .japanese: "スリープモード"; case .english: "Sleep Mode" }
+    }
+    var sleepModeDesc: String {
+        switch self { case .korean: "고양이가 자는 동안 알림을 받지 않아요"; case .japanese: "猫が寝ている間は通知を受けません"; case .english: "No notifications while cat is sleeping" }
+    }
+    var soundTitle: String {
+        switch self { case .korean: "완료 사운드"; case .japanese: "完了サウンド"; case .english: "Completion Sound" }
+    }
+    var soundDesc: String {
+        switch self { case .korean: "작업 완료 시 소리로 알려줘요"; case .japanese: "タスク完了時にサウンドで通知"; case .english: "Play sound when task completes" }
+    }
+    var customSpinnerTitle: String {
+        switch self { case .korean: "커스텀 문구"; case .japanese: "カスタムメッセージ"; case .english: "Custom Messages" }
+    }
+    var customSpinnerDesc: String {
+        switch self { case .korean: "나만의 스피너 문구를 추가해요"; case .japanese: "オリジナルのスピナーメッセージを追加"; case .english: "Add your own spinner messages" }
+    }
+    var addMessage: String {
+        switch self { case .korean: "추가"; case .japanese: "追加"; case .english: "Add" }
+    }
+    var appearanceTitle: String {
+        switch self { case .korean: "화면 모드"; case .japanese: "外観モード"; case .english: "Appearance" }
+    }
+    var catColorTitle: String {
+        switch self { case .korean: "고양이 색상"; case .japanese: "猫の色"; case .english: "Cat Color" }
+    }
+    var catColorReset: String {
+        switch self { case .korean: "초기화"; case .japanese: "リセット"; case .english: "Reset" }
+    }
+    var catColorSystemDesc: String {
+        switch self { case .korean: "시스템 설정에 따라 자동 변경"; case .japanese: "システム設定に合わせて自動変更"; case .english: "Auto-adapts to system theme" }
+    }
+
     // MARK: - UI Strings
 
     var healthCheckTitle: String {

@@ -22,10 +22,19 @@ final class MenuBarIconManager {
     private weak var settings: SettingsStore?
 
     private var spinnerMessages: [String] {
-        (settings?.selectedLanguage ?? .korean).spinnerMessages
+        let builtIn = (settings?.selectedLanguage ?? .korean).spinnerMessages
+        let custom = settings?.customSpinnerMessages ?? []
+        return custom.isEmpty ? builtIn : builtIn + custom
     }
     private var language: AppLanguage {
         settings?.selectedLanguage ?? .korean
+    }
+    private var isSleepMode: Bool {
+        settings?.sleepMode ?? false
+    }
+    private var catColor: NSColor? {
+        guard let hex = settings?.catColorHex else { return nil }
+        return NSColor(hex: hex)
     }
 
     private static let iconRainbowGradient: CGGradient? = {
@@ -75,8 +84,12 @@ final class MenuBarIconManager {
         switch state {
         case .idle:
             isShowingRainbow = false
-            scheduleNextYawn()
-            startIdleAnimation()
+            if isSleepMode {
+                startSleepAnimation()
+            } else {
+                scheduleNextYawn()
+                startIdleAnimation()
+            }
 
         case .working(let projectName):
             isShowingRainbow = false
@@ -323,12 +336,13 @@ final class MenuBarIconManager {
 
     // MARK: - Image Creation
 
-    private static func createCatLoaf(tailSwing: CGFloat = 0, yawn: CGFloat = 0) -> NSImage {
+    private static func createCatLoaf(tailSwing: CGFloat = 0, yawn: CGFloat = 0, customColor: NSColor? = nil) -> NSImage {
+        let drawColor = customColor ?? .black
         let img = NSImage(size: catSize, flipped: false) { rect in
-            drawCatLoafSilhouette(in: rect, tailSwing: tailSwing, yawn: yawn, color: .black)
+            drawCatLoafSilhouette(in: rect, tailSwing: tailSwing, yawn: yawn, color: drawColor)
             return true
         }
-        img.isTemplate = true
+        img.isTemplate = (customColor == nil)  // template only when using system color
         return img
     }
 
@@ -383,8 +397,26 @@ final class MenuBarIconManager {
 
                 let swing = sin(self.phase) * 0.4 + sin(self.phase * 1.8) * 0.2
                 self.statusItem.button?.image = Self.createCatLoaf(
-                    tailSwing: swing, yawn: self.yawnProgress
+                    tailSwing: swing, yawn: self.yawnProgress, customColor: self.catColor
                 )
+            }
+        }
+    }
+
+    /// Sleep mode: very slow breathing, no yawn, sleeping text
+    private func startSleepAnimation() {
+        phase = 0
+        setFixedTitle("💤 zzZ...")
+        let img = Self.createCatLoaf(customColor: catColor)
+        statusItem.button?.image = img
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.phase += 0.02
+                if self.phase > .pi * 2 { self.phase -= .pi * 2 }
+                // Very slow, gentle breathing opacity
+                let breath = 0.7 + 0.3 * sin(self.phase)
+                self.statusItem.button?.alphaValue = CGFloat(breath)
             }
         }
     }
@@ -401,7 +433,7 @@ final class MenuBarIconManager {
 
                 let swing = sin(self.phase) * 0.7 + sin(self.phase * 2.3) * 0.3
                 self.statusItem.button?.image = Self.createCatLoaf(
-                    tailSwing: swing, yawn: self.yawnProgress
+                    tailSwing: swing, yawn: self.yawnProgress, customColor: self.catColor
                 )
             }
         }
@@ -419,8 +451,7 @@ final class MenuBarIconManager {
                 let swing = sin(self.phase * 0.8) * 0.3
                 let pulse = 0.75 + 0.25 * sin(self.phase * 1.5)
 
-                let img = Self.createCatLoaf(tailSwing: swing)
-                // Keep isTemplate = true (set by createCatLoaf) so menu bar tint works
+                let img = Self.createCatLoaf(tailSwing: swing, customColor: self.catColor)
                 self.statusItem.button?.image = img
                 self.statusItem.button?.alphaValue = CGFloat(pulse)
             }
