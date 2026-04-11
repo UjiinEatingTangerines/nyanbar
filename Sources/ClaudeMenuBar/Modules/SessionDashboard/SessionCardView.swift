@@ -8,19 +8,41 @@ struct SessionCardView: View {
     @State private var isHovering = false
 
     var body: some View {
+        Button {
+            onFocus?()
+        } label: {
+            cardContent
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+    }
+
+    private var cardContent: some View {
         HStack(alignment: .center, spacing: 10) {
             // Status indicator
-            VStack(spacing: 0) {
-                statusIndicator
-            }
+            statusIndicator
 
             // Content
             VStack(alignment: .leading, spacing: 3) {
-                // Project name
-                Text(session.displayProjectName)
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                // Project name + terminal app badge
+                HStack(spacing: 6) {
+                    Text(session.displayProjectName)
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if let terminal = session.terminalDisplayName {
+                        Text(terminal)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.secondary.opacity(0.1))
+                            )
+                    }
+                }
 
                 // Path
                 Text(shortenedPath)
@@ -29,19 +51,11 @@ struct SessionCardView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                // Time + terminal + last tool
+                // Time + last tool
                 HStack(spacing: 5) {
                     timeLabel
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
-
-                    if let terminal = session.terminalDisplayName {
-                        Text("·")
-                            .foregroundStyle(.quaternary)
-                        Text(terminal)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.quaternary)
-                    }
 
                     if let tool = session.lastToolName {
                         Text("·")
@@ -64,7 +78,7 @@ struct SessionCardView: View {
 
             Spacer(minLength: 4)
 
-            // Right side: focus arrow or dismiss button
+            // Right side
             if session.status == .dead, let onDismiss {
                 Button(action: onDismiss) {
                     Image(systemName: "xmark.circle.fill")
@@ -76,7 +90,7 @@ struct SessionCardView: View {
             } else if session.canFocusTerminal {
                 Image(systemName: "arrow.up.forward.app")
                     .font(.system(size: 11))
-                    .foregroundStyle(isHovering ? .secondary : .quaternary)
+                    .foregroundStyle(isHovering ? .primary : .quaternary)
             }
         }
         .padding(.horizontal, 12)
@@ -89,12 +103,13 @@ struct SessionCardView: View {
             RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(borderColor, lineWidth: session.status == .dead ? 1 : 0)
         )
-        .contentShape(Rectangle())
-        .onHover { isHovering = $0 }
-        .onTapGesture { onFocus?() }
     }
 
     // MARK: - Computed
+
+    private var currentLanguage: AppLanguage {
+        AppLanguage(rawValue: UserDefaults.standard.string(forKey: "appLanguage") ?? "ko") ?? .korean
+    }
 
     private var shortenedPath: String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -125,7 +140,7 @@ struct SessionCardView: View {
         case .working:
             Text(RelativeTimeFormatter.durationString(from: session.startedAt))
         case .pending:
-            Text("🙋 waiting for input")
+            Text(currentLanguage.waitingForInput)
         case .completed:
             if let completedAt = session.completedAt {
                 Text("done \(RelativeTimeFormatter.string(from: completedAt))")

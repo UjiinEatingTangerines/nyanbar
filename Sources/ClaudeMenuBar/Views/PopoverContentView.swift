@@ -1,13 +1,23 @@
 import SwiftUI
 
-enum PopoverTab: String, CaseIterable {
-    case sessions = "Sessions"
-    case settings = "Settings"
+enum PopoverTab: CaseIterable {
+    case sessions
+    case history
+    case settings
 
     var icon: String {
         switch self {
         case .sessions: "tray.2"
+        case .history: "clock.arrow.circlepath"
         case .settings: "gearshape"
+        }
+    }
+
+    func title(_ lang: AppLanguage) -> String {
+        switch self {
+        case .sessions: lang.sessionsTab
+        case .history: lang.historyTab
+        case .settings: lang.settingsTab
         }
     }
 }
@@ -30,7 +40,9 @@ struct PopoverContentView: View {
             Group {
                 switch selectedTab {
                 case .sessions:
-                    SessionDashboardView(watcher: watcher, onFocusSession: onFocusSession)
+                    SessionDashboardView(watcher: watcher, settings: settings, onFocusSession: onFocusSession)
+                case .history:
+                    HistoryView(watcher: watcher, settings: settings, onFocusSession: onFocusSession)
                 case .settings:
                     SettingsView(settings: settings, onReschedule: onReschedule)
                 }
@@ -47,7 +59,7 @@ struct PopoverContentView: View {
     // MARK: - Top Bar
 
     private var topBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             HStack(spacing: 2) {
                 ForEach(PopoverTab.allCases, id: \.self) { tab in
                     Button {
@@ -55,14 +67,31 @@ struct PopoverContentView: View {
                             selectedTab = tab
                         }
                     } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Image(systemName: tab.icon)
-                                .font(.system(size: 10, weight: .medium))
-                            Text(tab.rawValue)
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.system(size: 9, weight: .medium))
+                            Text(tab.title(settings.selectedLanguage))
+                                .font(.system(size: 11, weight: .medium))
+                            // Badge for counts
+                            if tab == .sessions && watcher.activeCount > 0 {
+                                Text("\(watcher.activeCount)")
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(Capsule().fill(Color.green))
+                            }
+                            if tab == .history && watcher.historyCount > 0 {
+                                Text("\(watcher.historyCount)")
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(Capsule().fill(Color.secondary))
+                            }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
                                 .fill(selectedTab == tab
@@ -82,28 +111,9 @@ struct PopoverContentView: View {
             )
 
             Spacer()
-
-            if watcher.totalCount > 0 {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(watcher.activeCount > 0 ? Color.green : Color.secondary)
-                        .frame(width: 6, height: 6)
-                    Text("\(watcher.activeCount)")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.primary)
-                    Text("/ \(watcher.totalCount)")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule().fill(Color(nsColor: .controlBackgroundColor).opacity(0.6))
-                )
-            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Footer

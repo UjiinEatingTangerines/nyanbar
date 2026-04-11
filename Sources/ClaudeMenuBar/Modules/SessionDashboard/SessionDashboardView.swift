@@ -2,10 +2,13 @@ import SwiftUI
 
 struct SessionDashboardView: View {
     @ObservedObject var watcher: SessionDirectoryWatcher
+    @ObservedObject var settings: SettingsStore
     var onFocusSession: ((SessionState) -> Void)?
 
+    private var lang: AppLanguage { settings.selectedLanguage }
+
     var body: some View {
-        if watcher.sessions.isEmpty {
+        if watcher.activeSessions.isEmpty {
             emptyState
         } else {
             sessionList
@@ -16,7 +19,6 @@ struct SessionDashboardView: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             Spacer()
-
             ZStack {
                 Circle()
                     .fill(Color.secondary.opacity(0.06))
@@ -25,17 +27,15 @@ struct SessionDashboardView: View {
                     .font(.system(size: 30))
                     .foregroundStyle(.quaternary)
             }
-
             VStack(spacing: 4) {
-                Text("No active sessions")
+                Text(lang.noActiveSessions)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
-                Text("Start a Claude Code session\nto see it here")
+                Text(lang.startSessionHint)
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
             }
-
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -47,45 +47,17 @@ struct SessionDashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 SessionGroupView(
-                    title: "Working",
+                    title: lang.workingGroup,
                     icon: "circle.fill",
                     color: .green,
                     sessions: watcher.workingSessions,
                     onFocus: { onFocusSession?($0) }
                 )
-
                 SessionGroupView(
-                    title: "Waiting for Input",
+                    title: lang.waitingGroup,
                     icon: "hand.raised.fill",
                     color: .orange,
                     sessions: watcher.pendingSessions,
-                    onFocus: { onFocusSession?($0) }
-                )
-
-                SessionGroupView(
-                    title: "Completed",
-                    icon: "checkmark.circle.fill",
-                    color: .blue,
-                    sessions: watcher.completedSessions,
-                    onFocus: { onFocusSession?($0) }
-                )
-
-                SessionGroupView(
-                    title: "Crashed",
-                    icon: "exclamationmark.triangle.fill",
-                    color: .red,
-                    sessions: watcher.deadSessions,
-                    onDismiss: { session in
-                        watcher.deleteSessionFile(sessionId: session.sessionId)
-                    },
-                    onFocus: { onFocusSession?($0) }
-                )
-
-                SessionGroupView(
-                    title: "Idle",
-                    icon: "circle",
-                    color: .secondary,
-                    sessions: watcher.idleSessions,
                     onFocus: { onFocusSession?($0) }
                 )
             }

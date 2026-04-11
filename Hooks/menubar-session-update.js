@@ -160,11 +160,13 @@ function run(raw) {
     const cmuxTabId = process.env.CMUX_TAB_ID || null;
     const cmuxSurfaceId = process.env.CMUX_SURFACE_ID || null;
 
-    // Detect terminal app for non-cmux terminals
-    const terminalApp = process.env.TERM_PROGRAM       // iTerm2, Apple_Terminal, vscode, WarpTerminal
-      || process.env.__CFBundleIdentifier               // macOS bundle ID fallback
-      || (cmuxPanelId ? 'cmux' : null)
-      || null;
+    // Detect terminal app — cmux takes priority if detected
+    const isCmux = !!(process.env.CMUX_PANEL_ID || process.env.CMUX_CLAUDE_PID);
+    const terminalApp = isCmux
+      ? 'cmux'
+      : (process.env.TERM_PROGRAM             // iTerm2, Apple_Terminal, vscode, WarpTerminal
+        || process.env.__CFBundleIdentifier    // macOS bundle ID fallback
+        || null);
 
     switch (event) {
       case 'session-start': {

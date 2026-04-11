@@ -19,11 +19,11 @@ struct TerminalController {
     @discardableResult
     static func focusSession(_ session: SessionState) -> Bool {
         // Try cmux panel focus first (most precise)
-        if let panelId = session.cmuxSurfaceId ?? session.cmuxPanelId,
+        if let surfaceId = session.cmuxSurfaceId ?? session.cmuxPanelId,
            isCmuxAvailable {
             let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-"))
-            if panelId.unicodeScalars.allSatisfy({ allowed.contains($0) }) {
-                return focusCmuxPanel(panelId)
+            if surfaceId.unicodeScalars.allSatisfy({ allowed.contains($0) }) {
+                if focusCmuxPanel(surfaceId) { return true }
             }
         }
 
@@ -40,9 +40,11 @@ struct TerminalController {
     @discardableResult
     private static func focusCmuxPanel(_ panelId: String) -> Bool {
         guard let path = cmuxPath else { return false }
+
+        // Use --id-format uuids so focus-panel accepts UUID directly
         let task = Process()
         task.executableURL = URL(fileURLWithPath: path)
-        task.arguments = ["focus-panel", "--panel", panelId]
+        task.arguments = ["focus-panel", "--panel", panelId, "--id-format", "uuids"]
         task.standardOutput = FileHandle.nullDevice
         task.standardError = FileHandle.nullDevice
 
@@ -54,6 +56,7 @@ struct TerminalController {
                 return true
             }
         } catch {}
+
         return false
     }
 
@@ -61,33 +64,22 @@ struct TerminalController {
 
     @discardableResult
     private static func activateTerminalApp(_ terminalApp: String) -> Bool {
-        // Map TERM_PROGRAM / bundle IDs to known bundle identifiers
         let bundleId: String? = {
             switch terminalApp {
-            case "cmux", "com.cmuxterm.app":
-                return "com.cmuxterm.app"
-            case "ghostty", "com.mitchellh.ghostty":
-                return "com.mitchellh.ghostty"
-            case "iTerm.app", "iTerm2", "com.googlecode.iterm2":
-                return "com.googlecode.iterm2"
-            case "Apple_Terminal", "com.apple.Terminal":
-                return "com.apple.Terminal"
-            case "vscode", "com.microsoft.VSCode":
-                return "com.microsoft.VSCode"
-            case "WarpTerminal", "dev.warp.Warp-Stable":
-                return "dev.warp.Warp-Stable"
+            case "cmux", "com.cmuxterm.app": return "com.cmuxterm.app"
+            case "ghostty", "com.mitchellh.ghostty": return "com.mitchellh.ghostty"
+            case "iTerm.app", "iTerm2", "com.googlecode.iterm2": return "com.googlecode.iterm2"
+            case "Apple_Terminal", "com.apple.Terminal": return "com.apple.Terminal"
+            case "vscode", "com.microsoft.VSCode": return "com.microsoft.VSCode"
+            case "WarpTerminal", "dev.warp.Warp-Stable": return "dev.warp.Warp-Stable"
             default:
-                // If it looks like a bundle ID (contains dots), use it directly
                 if terminalApp.contains(".") { return terminalApp }
                 return nil
             }
         }()
 
         guard let id = bundleId else { return false }
-
-        DispatchQueue.main.async {
-            activateByBundleId(id)
-        }
+        DispatchQueue.main.async { activateByBundleId(id) }
         return true
     }
 

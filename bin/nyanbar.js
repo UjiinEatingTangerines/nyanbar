@@ -121,6 +121,7 @@ function install() {
   );
   fs.chmodSync(path.join(APP_BUNDLE, 'Contents', 'MacOS', APP_NAME), 0o755);
 
+  const pkgVersion = require(path.join(PKG_DIR, 'package.json')).version || '1.0.0';
   fs.writeFileSync(path.join(APP_BUNDLE, 'Contents', 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -132,9 +133,9 @@ function install() {
     <key>CFBundleName</key>
     <string>NyanBar</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>${pkgVersion}</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>${pkgVersion}</string>
     <key>LSUIElement</key>
     <true/>
     <key>LSMinimumSystemVersion</key>

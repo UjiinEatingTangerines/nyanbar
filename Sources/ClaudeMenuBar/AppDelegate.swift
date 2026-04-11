@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         watcher = SessionDirectoryWatcher()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        iconManager = MenuBarIconManager(statusItem: statusItem)
+        iconManager = MenuBarIconManager(statusItem: statusItem, settings: settings)
 
         if let button = statusItem.button {
             button.action = #selector(togglePopover(_:))
@@ -63,6 +63,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController = NSHostingController(rootView: contentView)
 
         watcher.startWatching()
+        healthCheck.onHealthCheckDone = { [weak self] in
+            guard let self, !self.iconManager.isShowingRainbow else { return }
+            self.iconManager.update(state: .healthCheckDone)
+        }
         healthCheck.start()
 
         timestampRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
@@ -82,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateIcon(sessions: sessions)
             }
             .store(in: &cancellables)
+
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -111,10 +116,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Terminal Focus
 
     private func focusTerminalSession(_ session: SessionState) {
-        popover.performClose(nil)
+        // Focus terminal first, then close popover
         let sessionCopy = session
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.global(qos: .userInitiated).async {
             TerminalController.focusSession(sessionCopy)
+        }
+        // Close popover after a short delay so focus command gets dispatched
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.popover.performClose(nil)
         }
     }
 
@@ -143,6 +152,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Icon Updates
 
     private func updateIcon(sessions: [SessionState]) {
+        // Don't interrupt health check flash or rainbow
+        if iconManager.currentState == .healthCheckDone { return }
+
         let completed = sessions.filter { $0.status == .completed }
         let completedIds = Set(completed.map(\.sessionId))
         let newlyCompleted = completedIds.subtracting(previousCompletedIds)

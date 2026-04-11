@@ -113,7 +113,8 @@ final class SessionDirectoryWatcher: ObservableObject {
 
     /// Stale threshold: if a "working" session hasn't updated in this many seconds,
     /// it's likely waiting for user input (permission prompt, etc.)
-    private static let pendingThreshold: TimeInterval = 5
+    /// 30 seconds to avoid false positives during long tool executions
+    private static let pendingThreshold: TimeInterval = 30
 
     var workingSessions: [SessionState] {
         sessions.filter { $0.status == .working && !isStaleWorking($0) }
@@ -143,7 +144,18 @@ final class SessionDirectoryWatcher: ObservableObject {
         sessions.filter { $0.status == .dead }
     }
 
+    /// Active sessions (Sessions tab)
+    var activeSessions: [SessionState] {
+        workingSessions + pendingSessions
+    }
+
+    /// History sessions (History tab): completed, idle, dead
+    var historySessions: [SessionState] {
+        sessions.filter { [.completed, .idle, .dead].contains($0.status) }
+    }
+
     var activeCount: Int { workingSessions.count + pendingSessions.count }
+    var historyCount: Int { historySessions.count }
     var totalCount: Int { sessions.count }
 
     var latestWorkingSession: SessionState? {

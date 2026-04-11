@@ -13,46 +13,20 @@ final class MenuBarIconManager {
     private var yawnProgress: CGFloat = 0       // 0 = none, 0→1 = yawning
     private var yawnCooldown: CGFloat = 0       // ticks until next yawn
     private var isYawning = false
-    private var currentState: IconState = .idle
+    private(set) var currentState: IconState = .idle
 
-    // Spinner messages (고양이 밈 + 이모지)
-    private static let spinnerMessages: [String] = [
-        // 고양이 일상
-        "🍞 빵 굽는 중..",
-        "🐾 꾹꾹이 하는 중..",
-        "😴 골골골..",
-        "👊 냥냥펀치 충전 중",
-        "🐟 츄르 대기 중..",
-        "📦 박스 탐색 중..",
-        "✨ 그루밍 타임..",
-        "💤 낮잠 모드..",
-        "👀 집사 감시 중..",
-        "🐾 발바닥 젤리..",
-        "🌿 캣닢 충전 완료",
-        "🐦 창밖 새 관찰 중",
-        "🛌 이불 점령 완료",
-        "⌨️ 키보드 점령 준비",
-        "💅 도도함 유지 중..",
-        "☀️ 햇살 충전 중..",
-        "💧 고양이는 액체..",
-        "🔴 레이저 추적 중!",
-        "⬆️ 높은 곳 탐색 중",
-        "💕 심장 도둑 활동중",
-        // 한국 밈
-        "😾 야옹 안 할거다냥",
-        "🐱 나 지금 삐졌다냥",
-        "🏃 3초후 미친듯이 뜀",
-        "🙄 집사 꼴보기 싫다냥",
-        "😏 츄르없으면 대화끝",
-        "👂 비닐봉지 바스락!",
-        "🤨 왜 쳐다보는 거냥",
-        "😼 내가 제일 귀여움",
-        "🐈 꼬리는 기분탓이냥",
-        "😸 집사 교육 95%",
-    ]
+    // Spinner (language-aware)
     private var spinnerIndex: Int = Int.random(in: 0..<30)
     private var spinnerTickCount: CGFloat = 0
     private static let spinnerInterval: CGFloat = 200 // ticks (10 sec at 20fps)
+    private weak var settings: SettingsStore?
+
+    private var spinnerMessages: [String] {
+        (settings?.selectedLanguage ?? .korean).spinnerMessages
+    }
+    private var language: AppLanguage {
+        settings?.selectedLanguage ?? .korean
+    }
 
     private static let iconRainbowGradient: CGGradient? = {
         let spectrum: [CGColor] = [
@@ -81,10 +55,12 @@ final class MenuBarIconManager {
         case working(projectName: String)
         case pending(projectName: String)
         case completed
+        case healthCheckDone  // brief yellow→green flash
     }
 
-    init(statusItem: NSStatusItem) {
+    init(statusItem: NSStatusItem, settings: SettingsStore? = nil) {
         self.statusItem = statusItem
+        self.settings = settings
         if let button = statusItem.button {
             button.imagePosition = .imageLeading
         }
@@ -111,12 +87,17 @@ final class MenuBarIconManager {
         case .pending(let projectName):
             isShowingRainbow = false
             startPendingAnimation()
-            setFixedTitle("🙋 \(truncate(projectName, maxLength: Self.titleFixedLength - 3))")
+            setFixedTitle("\(language.pendingPrefix) \(truncate(projectName, maxLength: Self.titleFixedLength - 6))")
 
         case .completed:
             isShowingRainbow = true
             startRainbowAnimation()
-            setFixedTitle("done!")
+            setFixedTitle(language.doneText)
+
+        case .healthCheckDone:
+            isShowingRainbow = false
+            startHealthCheckFlash()
+            setFixedTitle(language.healthCheckTitle)
         }
     }
 
@@ -466,6 +447,92 @@ final class MenuBarIconManager {
         }
     }
 
+    /// Health check done: yellow→green gradient flash for 3 seconds, then revert
+    private func startHealthCheckFlash() {
+        phase = 0
+        var elapsed: CGFloat = 0
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.phase += 0.04
+                if self.phase > .pi * 2 { self.phase -= .pi * 2 }
+                elapsed += 0.05
+
+                let swing = sin(self.phase) * 0.3
+                let img = Self.createHealthCheckCatLoaf(progress: elapsed / 3.0, tailSwing: swing)
+                self.statusItem.button?.image = img
+
+                // After 3 seconds, revert to idle with spinner
+                if elapsed >= 3.0 {
+                    self.stopAnimation()
+                    self.currentState = .idle
+                    self.scheduleNextYawn()
+                    self.spinnerTickCount = 0
+                    self.setFixedTitle(self.currentSpinnerMessage)
+                    self.startIdleAnimation()
+                }
+            }
+        }
+    }
+
+    /// Yellow → Green gradient cat for health check flash
+    private static func createHealthCheckCatLoaf(progress: CGFloat, tailSwing: CGFloat) -> NSImage {
+        let img = NSImage(size: catSize, flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+
+            let mask = NSImage(size: catSize, flipped: false) { mr in
+                drawCatLoafSilhouette(in: mr, tailSwing: tailSwing, yawn: 0, color: .black)
+                return true
+            }
+            guard let maskCG = mask.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                return false
+            }
+
+            // Gradient: yellow → green, blending based on progress
+            let yellow = NSColor(red: 1.0, green: 0.85, blue: 0.15, alpha: 1)
+            let green = NSColor(red: 0.3, green: 0.85, blue: 0.4, alpha: 1)
+
+            // Shift colors from yellow-dominant to green-dominant
+            let p = min(1.0, progress)
+            let c1 = blend(yellow, green, amount: p * 0.5)
+            let c2 = blend(yellow, green, amount: 0.3 + p * 0.7)
+
+            let colors: [CGColor] = [c1.cgColor, c2.cgColor]
+            let locs: [CGFloat] = [0.0, 1.0]
+            guard let grad = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors as CFArray, locations: locs
+            ) else { return false }
+
+            ctx.saveGState()
+            ctx.clip(to: rect, mask: maskCG)
+            ctx.drawLinearGradient(
+                grad,
+                start: CGPoint(x: 0, y: 0),
+                end: CGPoint(x: rect.width, y: rect.height),
+                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+            )
+            ctx.restoreGState()
+
+            // White eyes
+            drawWhiteEyes(in: rect)
+            return true
+        }
+        img.isTemplate = false
+        return img
+    }
+
+    private static func blend(_ c1: NSColor, _ c2: NSColor, amount: CGFloat) -> NSColor {
+        let a = min(1.0, max(0.0, amount))
+        let r1 = c1.redComponent, g1 = c1.greenComponent, b1 = c1.blueComponent
+        let r2 = c2.redComponent, g2 = c2.greenComponent, b2 = c2.blueComponent
+        return NSColor(
+            red: r1 + (r2 - r1) * a,
+            green: g1 + (g2 - g1) * a,
+            blue: b1 + (b2 - b1) * a,
+            alpha: 1.0
+        )
+    }
+
     // MARK: - Spinner
 
     // Max display width (characters) — all titles padded to this
@@ -476,16 +543,17 @@ final class MenuBarIconManager {
         spinnerTickCount += 1
         if spinnerTickCount >= Self.spinnerInterval {
             spinnerTickCount = 0
-            var next = Int.random(in: 0..<Self.spinnerMessages.count)
-            if next == spinnerIndex { next = (next + 1) % Self.spinnerMessages.count }
+            let msgs = spinnerMessages
+            var next = Int.random(in: 0..<msgs.count)
+            if next == spinnerIndex { next = (next + 1) % msgs.count }
             spinnerIndex = next
-            // Immediately update — no gap between messages
             setFixedTitle(currentSpinnerMessage)
         }
     }
 
     private var currentSpinnerMessage: String {
-        Self.spinnerMessages[spinnerIndex % Self.spinnerMessages.count]
+        let msgs = spinnerMessages
+        return msgs[spinnerIndex % msgs.count]
     }
 
     // MARK: - Helpers

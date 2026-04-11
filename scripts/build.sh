@@ -23,7 +23,11 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/${APP_NAME}"
 
-cat > "$APP_BUNDLE/Contents/Info.plist" << 'PLIST'
+# Read version from package.json
+VERSION=$(node -e "console.log(require('${PROJECT_DIR}/package.json').version)" 2>/dev/null || echo "1.0.0")
+echo "  Version: ${VERSION}"
+
+cat > "$APP_BUNDLE/Contents/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -33,11 +37,11 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << 'PLIST'
     <key>CFBundleIdentifier</key>
     <string>com.claudecode.menubar</string>
     <key>CFBundleName</key>
-    <string>Claude MenuBar</string>
+    <string>NyanBar</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>${VERSION}</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>${VERSION}</string>
     <key>LSUIElement</key>
     <true/>
     <key>LSMinimumSystemVersion</key>

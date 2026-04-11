@@ -27,20 +27,23 @@ enum HealthCheckInterval: Int, CaseIterable, Identifiable {
 }
 
 final class SettingsStore: ObservableObject {
-    @AppStorage("healthCheckIntervalRawValue")
-    var healthCheckIntervalRawValue: Int = HealthCheckInterval.thirtySeconds.rawValue
+    @Published var selectedInterval: HealthCheckInterval {
+        didSet { UserDefaults.standard.set(selectedInterval.rawValue, forKey: "healthCheckIntervalRawValue") }
+    }
 
-    var selectedInterval: HealthCheckInterval {
-        get {
-            HealthCheckInterval(rawValue: healthCheckIntervalRawValue) ?? .thirtySeconds
-        }
-        set {
-            healthCheckIntervalRawValue = newValue.rawValue
-            objectWillChange.send()
-        }
+    @Published var selectedLanguage: AppLanguage {
+        didSet { UserDefaults.standard.set(selectedLanguage.rawValue, forKey: "appLanguage") }
     }
 
     var healthCheckSeconds: TimeInterval {
         selectedInterval.seconds
+    }
+
+    init() {
+        let intervalRaw = UserDefaults.standard.integer(forKey: "healthCheckIntervalRawValue")
+        self.selectedInterval = HealthCheckInterval(rawValue: intervalRaw) ?? .thirtySeconds
+
+        let langRaw = UserDefaults.standard.string(forKey: "appLanguage") ?? "ko"
+        self.selectedLanguage = AppLanguage(rawValue: langRaw) ?? .korean
     }
 }
