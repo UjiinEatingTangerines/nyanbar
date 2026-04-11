@@ -123,6 +123,7 @@ function getEventType(input) {
     if (arg.includes('menubar:session-start')) return 'session-start';
     if (arg.includes('menubar:tool-use')) return 'tool-use';
     if (arg.includes('menubar:stop')) return 'stop';
+    if (arg.includes('menubar:notification')) return 'notification';
     if (arg.includes('menubar:session-end')) return 'session-end';
   }
 
@@ -271,6 +272,40 @@ function run(raw) {
         }
 
         writeStateAtomic(filePath, state);
+        break;
+      }
+
+      case 'notification': {
+        // Notification = Claude is waiting for user attention
+        // This is the definitive "pending" signal
+        if (existing) {
+          existing.status = 'pending';
+          existing.lastUpdatedAt = now;
+          if (!existing.pid) existing.pid = claudePid;
+          if (!existing.terminalApp && terminalApp) existing.terminalApp = terminalApp;
+          if (!existing.cmuxPanelId && cmuxPanelId) existing.cmuxPanelId = cmuxPanelId;
+          writeStateAtomic(filePath, existing);
+        } else {
+          const state = {
+            schemaVersion: 1,
+            sessionId,
+            status: 'pending',
+            projectName: getProjectName(),
+            workingDirectory: process.cwd(),
+            startedAt: now,
+            lastUpdatedAt: now,
+            lastMessage: null,
+            lastToolName: null,
+            completedAt: null,
+            diedAt: null,
+            pid: claudePid,
+            terminalApp,
+            cmuxPanelId,
+            cmuxTabId,
+            cmuxSurfaceId
+          };
+          writeStateAtomic(filePath, state);
+        }
         break;
       }
 

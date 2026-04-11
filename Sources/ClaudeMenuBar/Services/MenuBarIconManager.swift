@@ -426,7 +426,7 @@ final class MenuBarIconManager {
         }
     }
 
-    /// Pending: slow pulse (opacity blink) + gentle tail
+    /// Pending: slow pulse (opacity blink) + gentle tail — keeps template mode
     private func startPendingAnimation() {
         phase = 0
         animationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
@@ -435,15 +435,11 @@ final class MenuBarIconManager {
                 self.phase += 0.05
                 if self.phase > .pi * 2 { self.phase -= .pi * 2 }
 
-                // Gentle tail sway
                 let swing = sin(self.phase * 0.8) * 0.3
-
-                // Pulse opacity: 0.5 ~ 1.0 (subtle blink to draw attention)
                 let pulse = 0.75 + 0.25 * sin(self.phase * 1.5)
 
                 let img = Self.createCatLoaf(tailSwing: swing)
-                img.isTemplate = false  // disable template to control opacity
-
+                // Keep isTemplate = true (set by createCatLoaf) so menu bar tint works
                 self.statusItem.button?.image = img
                 self.statusItem.button?.alphaValue = CGFloat(pulse)
             }

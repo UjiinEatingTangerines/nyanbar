@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var cancellables = Set<AnyCancellable>()
     private var previousCompletedIds = Set<String>()
+    private var acknowledgedPendingIds = Set<String>()
     private var timestampRefreshTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -119,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Event Acknowledgment
 
-    /// One click = acknowledge everything: dismiss rainbow + mark all completed as seen
+    /// One click = acknowledge everything: dismiss rainbow + mark all pending/completed as seen
     private func acknowledgeAllEvents() {
         // Dismiss rainbow if active
         if iconManager.isShowingRainbow {
@@ -127,12 +128,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             RainbowOverlayManager.shared.hideRainbow()
         }
 
-        // Snapshot ALL current completed sessions as acknowledged
+        // Mark all completed as acknowledged
         let allCompleted = watcher.sessions.filter { $0.status == .completed }
         previousCompletedIds = Set(allCompleted.map(\.sessionId))
 
-        // Revert icon to current state
-        updateIconWithoutRainbow()
+        // Mark all pending as acknowledged (won't show pending icon until new pending arrives)
+        let allPending = watcher.pendingSessions
+        acknowledgedPendingIds = Set(allPending.map(\.sessionId))
+
+        // Revert icon to idle
+        iconManager.update(state: .idle)
     }
 
     // MARK: - Icon Updates
@@ -147,6 +152,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let allCurrentIds = Set(sessions.map(\.sessionId))
         previousCompletedIds = previousCompletedIds.intersection(allCurrentIds)
 
+        // Clear acknowledged pending for sessions that returned to working
+        let workingIds = Set(sessions.filter { $0.status == .working }.map(\.sessionId))
+        acknowledgedPendingIds.subtract(workingIds)
+        acknowledgedPendingIds = acknowledgedPendingIds.intersection(allCurrentIds)
+
         // Don't interrupt an active rainbow
         if iconManager.isShowingRainbow { return }
 
@@ -160,10 +170,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateIconWithoutRainbow() {
-        // Priority: working > pending > idle
+        // Priority: working > unacknowledged pending > idle
         if let latest = watcher.workingSessions.first {
+            // New working session clears acknowledged state
+            acknowledgedPendingIds.remove(latest.sessionId)
             iconManager.update(state: .working(projectName: latest.displayProjectName))
-        } else if let pending = watcher.pendingSessions.first {
+        } else if let pending = watcher.pendingSessions.first(where: { !acknowledgedPendingIds.contains($0.sessionId) }) {
             iconManager.update(state: .pending(projectName: pending.displayProjectName))
         } else {
             iconManager.update(state: .idle)

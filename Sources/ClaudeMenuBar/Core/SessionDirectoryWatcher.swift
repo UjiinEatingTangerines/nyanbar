@@ -111,12 +111,24 @@ final class SessionDirectoryWatcher: ObservableObject {
 
     // MARK: - Computed
 
+    /// Stale threshold: if a "working" session hasn't updated in this many seconds,
+    /// it's likely waiting for user input (permission prompt, etc.)
+    private static let pendingThreshold: TimeInterval = 5
+
     var workingSessions: [SessionState] {
-        sessions.filter { $0.status == .working }
+        sessions.filter { $0.status == .working && !isStaleWorking($0) }
     }
 
     var pendingSessions: [SessionState] {
-        sessions.filter { $0.status == .pending }
+        let explicitPending = sessions.filter { $0.status == .pending }
+        let stalePending = sessions.filter { $0.status == .working && isStaleWorking($0) }
+        return explicitPending + stalePending
+    }
+
+    /// A "working" session that hasn't been updated recently is likely waiting for user input
+    private func isStaleWorking(_ session: SessionState) -> Bool {
+        guard session.status == .working else { return false }
+        return Date().timeIntervalSince(session.lastUpdatedAt) > Self.pendingThreshold
     }
 
     var completedSessions: [SessionState] {
