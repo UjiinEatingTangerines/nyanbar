@@ -50,5 +50,8 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << PLIST
 </plist>
 PLIST
 
+# Ad-hoc code sign (required on macOS to prevent SIGKILL)
+codesign --force --sign - "$APP_BUNDLE" 2>/dev/null
+
 echo "==> App bundle created: ${APP_BUNDLE}"
 echo "==> Run with: open \"${APP_BUNDLE}\""

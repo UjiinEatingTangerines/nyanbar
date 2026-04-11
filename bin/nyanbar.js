@@ -142,6 +142,8 @@ function install() {
     <string>14.0</string>
 </dict>
 </plist>`);
+  // Ad-hoc code sign (required on macOS to prevent SIGKILL)
+  run(`codesign --force --sign - "${APP_BUNDLE}"`);
   ok(`App bundle: ${APP_BUNDLE}`);
 
   // Install hook script
