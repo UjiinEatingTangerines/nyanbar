@@ -23,7 +23,7 @@ final class MenuBarIconManager {
 
     private var spinnerMessages: [String] {
         let builtIn = (settings?.selectedLanguage ?? .korean).spinnerMessages
-        let custom = settings?.customSpinnerMessages ?? []
+        let custom = settings?.enabledCustomMessages ?? []
         return custom.isEmpty ? builtIn : builtIn + custom
     }
     private var language: AppLanguage {

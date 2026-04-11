@@ -26,6 +26,12 @@ enum HealthCheckInterval: Int, CaseIterable, Identifiable {
     }
 }
 
+struct SpinnerMessage: Codable, Identifiable, Equatable {
+    var id: String { text }
+    let text: String
+    var enabled: Bool
+}
+
 final class SettingsStore: ObservableObject {
     @Published var selectedInterval: HealthCheckInterval {
         didSet { UserDefaults.standard.set(selectedInterval.rawValue, forKey: "healthCheckIntervalRawValue") }
@@ -43,11 +49,6 @@ final class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(sleepMode, forKey: "sleepMode") }
     }
 
-    @Published var customSpinnerMessages: [String] {
-        didSet { UserDefaults.standard.set(customSpinnerMessages, forKey: "customSpinnerMessages") }
-    }
-
-    /// Appearance: "system", "light", "dark"
     @Published var appearance: String {
         didSet {
             UserDefaults.standard.set(appearance, forKey: "appearance")
@@ -55,13 +56,21 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    /// Cat icon color: nil = system template (auto), otherwise fixed hex color
     @Published var catColorHex: String? {
         didSet { UserDefaults.standard.set(catColorHex, forKey: "catColorHex") }
     }
 
+    @Published var customMessages: [SpinnerMessage] {
+        didSet { saveCustomMessages() }
+    }
+
     var healthCheckSeconds: TimeInterval {
         selectedInterval.seconds
+    }
+
+    /// Only enabled custom messages for spinner
+    var enabledCustomMessages: [String] {
+        customMessages.filter(\.enabled).map(\.text)
     }
 
     init() {
@@ -73,11 +82,36 @@ final class SettingsStore: ObservableObject {
 
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
         self.sleepMode = UserDefaults.standard.bool(forKey: "sleepMode")
-        self.customSpinnerMessages = UserDefaults.standard.stringArray(forKey: "customSpinnerMessages") ?? []
         self.appearance = UserDefaults.standard.string(forKey: "appearance") ?? "system"
         self.catColorHex = UserDefaults.standard.string(forKey: "catColorHex")
 
+        // Load custom messages
+        if let data = UserDefaults.standard.data(forKey: "customMessagesV2"),
+           let decoded = try? JSONDecoder().decode([SpinnerMessage].self, from: data) {
+            self.customMessages = decoded
+        } else if let old = UserDefaults.standard.stringArray(forKey: "customSpinnerMessages"), !old.isEmpty {
+            // Migrate old format
+            self.customMessages = old.map { SpinnerMessage(text: $0, enabled: true) }
+            UserDefaults.standard.removeObject(forKey: "customSpinnerMessages")
+        } else {
+            self.customMessages = []
+        }
+
         applyAppearance()
+    }
+
+    func addCustomMessage(_ text: String) {
+        customMessages.append(SpinnerMessage(text: text, enabled: true))
+    }
+
+    func removeCustomMessage(at index: Int) {
+        guard index < customMessages.count else { return }
+        customMessages.remove(at: index)
+    }
+
+    func toggleCustomMessage(at index: Int) {
+        guard index < customMessages.count else { return }
+        customMessages[index].enabled.toggle()
     }
 
     func applyAppearance() {
@@ -86,11 +120,15 @@ final class SettingsStore: ObservableObject {
         case "dark": NSAppearance(named: .darkAqua)
         default: nil
         }
-
-        // Apply to app and all windows (including popover)
         NSApp.appearance = newAppearance
         for window in NSApp.windows {
             window.appearance = newAppearance
+        }
+    }
+
+    private func saveCustomMessages() {
+        if let data = try? JSONEncoder().encode(customMessages) {
+            UserDefaults.standard.set(data, forKey: "customMessagesV2")
         }
     }
 }

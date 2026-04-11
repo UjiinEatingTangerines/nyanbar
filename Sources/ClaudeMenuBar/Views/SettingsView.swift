@@ -203,6 +203,7 @@ struct SettingsView: View {
                             TextField("🐱 새 문구...", text: $newSpinnerText)
                                 .textFieldStyle(.roundedBorder)
                                 .font(.system(size: 11))
+                                .onSubmit { addCustomMessage() }
 
                             Button(settings.selectedLanguage.addMessage) {
                                 addCustomMessage()
@@ -211,28 +212,46 @@ struct SettingsView: View {
                             .disabled(newSpinnerText.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
 
-                        // List of custom messages
-                        if !settings.customSpinnerMessages.isEmpty {
-                            VStack(spacing: 4) {
-                                ForEach(settings.customSpinnerMessages, id: \.self) { msg in
-                                    HStack {
-                                        Text(msg)
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(1)
-                                        Spacer()
+                        // List of custom messages with on/off + delete
+                        if !settings.customMessages.isEmpty {
+                            VStack(spacing: 3) {
+                                ForEach(Array(settings.customMessages.enumerated()), id: \.offset) { index, msg in
+                                    HStack(spacing: 6) {
+                                        // On/Off toggle
                                         Button {
-                                            removeCustomMessage(msg)
+                                            settings.toggleCustomMessage(at: index)
                                         } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.system(size: 10))
-                                                .foregroundStyle(.tertiary)
+                                            Image(systemName: msg.enabled ? "checkmark.circle.fill" : "circle")
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(msg.enabled ? Color.green : Color.gray)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        // Message text
+                                        Text(msg.text)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(msg.enabled ? .primary : .secondary)
+                                            .strikethrough(!msg.enabled, color: .secondary)
+                                            .lineLimit(1)
+
+                                        Spacer()
+
+                                        // Delete button
+                                        Button {
+                                            settings.removeCustomMessage(at: index)
+                                        } label: {
+                                            Image(systemName: "trash")
+                                                .font(.system(size: 9))
+                                                .foregroundStyle(Color.secondary)
                                         }
                                         .buttonStyle(.plain)
                                     }
                                     .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.06)))
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 5)
+                                            .fill(msg.enabled ? Color.green.opacity(0.04) : Color.secondary.opacity(0.04))
+                                    )
                                 }
                             }
                         }
@@ -441,12 +460,8 @@ struct SettingsView: View {
     private func addCustomMessage() {
         let msg = newSpinnerText.trimmingCharacters(in: .whitespaces)
         guard !msg.isEmpty else { return }
-        settings.customSpinnerMessages.append(msg)
+        settings.addCustomMessage(msg)
         newSpinnerText = ""
-    }
-
-    private func removeCustomMessage(_ msg: String) {
-        settings.customSpinnerMessages.removeAll { $0 == msg }
     }
 
     @ViewBuilder
