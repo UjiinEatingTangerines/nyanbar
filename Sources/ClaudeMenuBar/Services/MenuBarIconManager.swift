@@ -168,6 +168,13 @@ final class MenuBarIconManager {
     // Fixed size — extra width to accommodate tail animation without jitter
     private static let catSize = NSSize(width: 22, height: 18)
 
+    /// Determine if a color is "light" (needs dark eyes)
+    private static func isLightColor(_ color: NSColor) -> Bool {
+        guard let rgb = color.usingColorSpace(.sRGB) else { return false }
+        let luminance = 0.299 * rgb.redComponent + 0.587 * rgb.greenComponent + 0.114 * rgb.blueComponent
+        return luminance > 0.6
+    }
+
     private static func drawCatLoafSilhouette(
         in rect: NSRect,
         tailSwing: CGFloat,
@@ -272,9 +279,10 @@ final class MenuBarIconManager {
         tail.lineCapStyle = .round
         tail.stroke()
 
-        // === EYES ===
+        // === EYES (dark for light cats, white for dark cats) ===
         let eS = w * 0.065
-        NSColor.white.setFill()
+        let eyeColor: NSColor = isLightColor(color) ? .black : .white
+        eyeColor.setFill()
         NSBezierPath(ovalIn: NSRect(x: hcx - hr * 0.42, y: hcy - eS * 0.3, width: eS, height: eS)).fill()
         NSBezierPath(ovalIn: NSRect(x: hcx + hr * 0.18, y: hcy - eS * 0.3, width: eS, height: eS)).fill()
 
