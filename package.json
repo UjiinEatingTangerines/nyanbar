@@ -1,6 +1,6 @@
 {
   "name": "nyanbar",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "🐱 NyanBar — macOS 메뉴바에서 Claude Code 세션을 모니터링하는 고양이빵 앱. 무지개 알림, 세션 대시보드, 멀티 터미널 지원.",
   "author": "UjiinEatingTangerines",
   "license": "MIT",

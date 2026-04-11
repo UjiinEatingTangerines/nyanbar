@@ -8,10 +8,6 @@
 npm install -g nyanbar && nyanbar install
 ```
 
-<!-- 스크린샷은 assets/ 에 추가 후 아래 주석 해제
-![Preview](assets/menubar-preview.png)
--->
-
 ---
 
 ## 왜 NyanBar?
@@ -32,12 +28,14 @@ NyanBar는 **메뉴바에 고양이빵이 앉아서** 모든 Claude Code 세션 
 |------|--------|-------------|
 | **Idle** | 꼬리 살랑살랑 + 가끔 하품 | `🍞 빵 굽는 중..` (밈 30종 랜덤) |
 | **Working** | 꼬리 활발히 S자 흔들림 | 프로젝트명 |
-| **Completed** | 🌈 무지개 고양이 | `done!` |
+| **Pending** | 아이콘 깜빡 | `🙋 입력 대기` |
+| **Completed** | 🌈 무지개 고양이 + 사운드 | `done!` |
+| **Sleep** | 💤 천천히 숨쉬는 고양이 | `💤 zzZ...` |
 
 📋 **세션 대시보드** — 고양이 클릭하면 모든 세션을 한눈에
 
-- Working / Completed / Crashed / Idle 그룹별 카드 UI
-- 프로젝트명, 경로, 경과시간, 마지막 메시지, 사용 터미널 표시
+- Working / Waiting for Input / 그룹별 카드 UI
+- 프로젝트명, 경로, 경과시간, 터미널 앱, 마지막 메시지 표시
 - 세션 카드 클릭 → 해당 터미널로 바로 이동
 
 🌈 **무지개 알림** — 작업 완료를 놓치지 않음
@@ -45,12 +43,24 @@ NyanBar는 **메뉴바에 고양이빵이 앉아서** 모든 Claude Code 세션 
 - 화면 상단에 무지개 그라디언트 바가 흐름
 - 모든 연결된 모니터에 동시 표시
 - 확인할 때까지 계속 표시 (아이콘 클릭으로 해제)
+- 10초 이상 작업 후 완료만 트리거 (짧은 응답은 무시)
+
+📜 **히스토리** — 완료/유휴/충돌 세션 이력
+
+- History 탭에서 과거 세션 확인
+- 24시간 후 자동 삭제
+- Clear All 버튼으로 수동 정리
 
 ⚙️ **설정**
 
-- 헬스체크 주기: 5분 / 30분 / 1시간
-- 다음 헬스체크까지 남은 시간 실시간 카운트다운
-- 로그인 시 자동 시작 (LaunchAgent)
+- 🌐 **언어**: 한국어 / 日本語 / English (실시간 전환)
+- 🌓 **화면 모드**: System / Light / Dark
+- 🎨 **고양이 색상**: 12색 팔레트 + 초기화 (시스템 자동)
+- 🔊 **완료 사운드**: on/off
+- 🌙 **수면 모드**: 모든 알림 일시 중지
+- 💬 **커스텀 스피너**: 나만의 문구 추가
+- ❤️ **헬스체크**: 10s / 20s / 30s / 5m / 30m / 1h
+- 🔄 **업데이트 체크**: npm 최신 버전 확인 + 원클릭 업데이트
 
 ---
 
@@ -82,9 +92,9 @@ node bin/nyanbar.js install
 ### `nyanbar install` 이 하는 것
 
 1. Swift로 앱 빌드 (`swift build -c release`)
-2. `~/Applications/ClaudeMenuBar.app` 번들 생성
+2. `~/Applications/ClaudeMenuBar.app` 번들 생성 + 코드 서명
 3. Hook 스크립트를 `~/.claude/scripts/hooks/`에 복사
-4. `~/.claude/settings.json`에 4개 Hook 자동 등록
+4. `~/.claude/settings.json`에 5개 Hook 자동 등록 (SessionStart, PreToolUse, Stop, Notification, SessionEnd)
 5. LaunchAgent 설치 (로그인 시 자동 시작)
 6. 앱 실행
 
@@ -106,13 +116,31 @@ nyanbar status      # 설치 상태 확인
 
 1. 메뉴바에 고양이빵 아이콘이 나타남
 2. Claude Code 세션을 시작하면 자동 감지
-3. 고양이 클릭 → 세션 대시보드
+3. 고양이 클릭 → 세션 대시보드 (Sessions / History / Settings 탭)
 4. 세션 카드 클릭 → 해당 터미널로 이동
-5. 작업 완료 → 무지개 알림 → 고양이 클릭으로 확인
+5. 작업 완료 → 무지개 + 사운드 → 고양이 클릭으로 확인
 
-### 스피너 문구 (30종)
+### 스피너 문구 (30종 × 3개 언어)
 
-> 🍞 빵 굽는 중.. · 🐾 꾹꾹이 하는 중.. · 😴 골골골.. · 💤 낮잠 모드.. · 👀 집사 감시 중.. · 😾 야옹 안 할거다냥 · 🏃 3초후 미친듯이 뜀 · 😸 집사 교육 95% · 💧 고양이는 액체.. · 🔴 레이저 추적 중! · ...
+> 🍞 빵 굽는 중.. · 🐾 꾹꾹이 하는 중.. · 😴 골골골.. · 😾 야옹 안 할거다냥 · 🏃 3초후 미친듯이 뜀 · 😸 집사 교육 95% · ...
+
+> 🍞 食パン焼き中.. · 🐾 ふみふみ中.. · 😴 ゴロゴロ.. · 😾 にゃーしないもん · 🏃 3秒後に全力疾走 · 😸 下僕の教育 95% · ...
+
+> 🍞 Baking bread.. · 🐾 Making biscuits.. · 😴 Purring away.. · 😾 Not meowing today · 🏃 Zoomies in 3..2.. · 😸 Hooman training 95% · ...
+
+---
+
+## Smart Detection
+
+| 상황 | 감지 방법 | 결과 |
+|------|----------|------|
+| 10초+ 작업 후 완료 | Stop hook + duration check | ✅ 무지개 + 사운드 |
+| 짧은 응답/에러 | Stop hook + duration < 10s | idle (무지개 X) |
+| AskUserQuestion | Stop hook + tool name check | pending (🙋 입력 대기) |
+| 질문 패턴 | 메시지 패턴 매칭 | pending |
+| 권한 프롬프트 | 30초 stale-working 감지 | pending |
+| 프로세스 종료 | PID health check | dead |
+| cmux 탭 닫힘 | Surface 유효성 체크 | dead |
 
 ---
 
@@ -126,6 +154,7 @@ nyanbar status      # 설치 상태 확인
 | Terminal.app | ✅ | ✅ |
 | VS Code | ✅ | ✅ |
 | Warp | ✅ | ✅ |
+| IntelliJ | ✅ | ✅ |
 
 ---
 
@@ -153,11 +182,28 @@ nyanbar/
 ├── bin/nyanbar.js            # CLI (install/uninstall/start/stop/status)
 ├── Package.swift             # Swift Package Manager
 ├── Sources/ClaudeMenuBar/
+│   ├── ClaudeMenuBarApp.swift
 │   ├── AppDelegate.swift     # NSStatusItem + NSPopover
-│   ├── Core/                 # SessionState, Watcher, Formatter
-│   ├── Services/             # IconManager, HealthCheck, Settings, Terminal
-│   ├── Modules/              # SessionDashboard, RainbowAnimation
-│   └── Views/                # PopoverContent, Settings
+│   ├── Core/
+│   │   ├── SessionState.swift
+│   │   ├── SessionDirectoryWatcher.swift
+│   │   ├── RelativeTimeFormatter.swift
+│   │   ├── AppLanguage.swift       # i18n (ko/ja/en)
+│   │   └── ColorUtils.swift        # NSColor ↔ hex
+│   ├── Services/
+│   │   ├── MenuBarIconManager.swift  # Cat icon + animations
+│   │   ├── HealthCheckService.swift  # PID + surface check
+│   │   ├── SettingsStore.swift       # UserDefaults
+│   │   ├── TerminalController.swift  # cmux/terminal focus
+│   │   ├── UpdateChecker.swift       # npm version check
+│   │   └── SoundPlayer.swift         # Completion sound
+│   ├── Modules/
+│   │   ├── SessionDashboard/
+│   │   └── RainbowAnimation/
+│   └── Views/
+│       ├── PopoverContentView.swift
+│       ├── HistoryView.swift
+│       └── SettingsView.swift
 ├── Hooks/
 │   └── menubar-session-update.js
 └── scripts/
@@ -175,7 +221,7 @@ nyanbar/
 nyanbar uninstall
 ```
 
-앱, Hook, LaunchAgent, 세션 데이터까지 깨끗하게 제거됩니다.
+앱, Hook, LaunchAgent, 세션 데이터, settings.json의 Hook 항목까지 깨끗하게 제거됩니다.
 
 ## License
 
