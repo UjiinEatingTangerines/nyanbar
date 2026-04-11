@@ -176,6 +176,7 @@ function run(raw) {
           workingDirectory: process.cwd(),
           startedAt: now,
           lastUpdatedAt: now,
+          workingStartedAt: now,
           lastMessage: null,
           lastToolName: null,
           completedAt: null,
@@ -213,6 +214,12 @@ function run(raw) {
           cmuxTabId,
           cmuxSurfaceId
         };
+
+        // Track when this working cycle started (reset on non-working → working transition)
+        const wasWorking = existing && existing.status === 'working';
+        if (!wasWorking) {
+          state.workingStartedAt = now;
+        }
 
         state.status = 'working';
         state.lastUpdatedAt = now;
@@ -254,8 +261,10 @@ function run(raw) {
         const lastTool = existing ? existing.lastToolName : null;
         const isPending = lastTool === 'AskUserQuestion';
 
-        // 2. Check working duration (time since last working state started)
-        const workingStart = existing ? new Date(existing.lastUpdatedAt).getTime() : 0;
+        // 2. Check working duration since last working cycle started
+        const workingStart = existing?.workingStartedAt
+          ? new Date(existing.workingStartedAt).getTime()
+          : (existing ? new Date(existing.startedAt).getTime() : 0);
         const workingDuration = (Date.now() - workingStart) / 1000;
 
         // 3. Check if real work tools were used
