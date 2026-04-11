@@ -115,6 +115,10 @@ final class SessionDirectoryWatcher: ObservableObject {
         sessions.filter { $0.status == .working }
     }
 
+    var pendingSessions: [SessionState] {
+        sessions.filter { $0.status == .pending }
+    }
+
     var completedSessions: [SessionState] {
         sessions.filter { $0.status == .completed }
     }
@@ -127,7 +131,7 @@ final class SessionDirectoryWatcher: ObservableObject {
         sessions.filter { $0.status == .dead }
     }
 
-    var activeCount: Int { workingSessions.count }
+    var activeCount: Int { workingSessions.count + pendingSessions.count }
     var totalCount: Int { sessions.count }
 
     var latestWorkingSession: SessionState? {
@@ -139,9 +143,10 @@ final class SessionDirectoryWatcher: ObservableObject {
     private func statusOrder(_ status: SessionStatus) -> Int {
         switch status {
         case .working: return 0
-        case .completed: return 1
-        case .idle: return 2
-        case .dead: return 3
+        case .pending: return 1
+        case .completed: return 2
+        case .idle: return 3
+        case .dead: return 4
         }
     }
 

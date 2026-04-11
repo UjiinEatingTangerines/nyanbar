@@ -160,10 +160,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateIconWithoutRainbow() {
-        let working = watcher.workingSessions
-
-        if let latest = working.first {
+        // Priority: working > pending > idle
+        if let latest = watcher.workingSessions.first {
             iconManager.update(state: .working(projectName: latest.displayProjectName))
+        } else if let pending = watcher.pendingSessions.first {
+            iconManager.update(state: .pending(projectName: pending.displayProjectName))
         } else {
             iconManager.update(state: .idle)
         }

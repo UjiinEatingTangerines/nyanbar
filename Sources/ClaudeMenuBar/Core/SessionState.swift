@@ -2,6 +2,7 @@ import Foundation
 
 enum SessionStatus: String, Codable, CaseIterable {
     case working
+    case pending   // waiting for user input (AskUserQuestion, etc.)
     case completed
     case idle
     case dead

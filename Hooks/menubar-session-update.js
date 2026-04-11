@@ -230,7 +230,7 @@ function run(raw) {
         const state = existing || {
           schemaVersion: 1,
           sessionId,
-          status: 'completed',
+          status: 'idle',
           projectName: getProjectName(),
           workingDirectory: process.cwd(),
           startedAt: now,
@@ -242,13 +242,33 @@ function run(raw) {
           cmuxSurfaceId
         };
 
-        state.status = 'completed';
         state.lastUpdatedAt = now;
-        state.completedAt = now;
         state.lastMessage = truncateMessage(input.last_assistant_message) || state.lastMessage;
         if (!state.pid) state.pid = claudePid;
         if (!state.terminalApp && terminalApp) state.terminalApp = terminalApp;
         if (!state.cmuxPanelId && cmuxPanelId) state.cmuxPanelId = cmuxPanelId;
+
+        // Classify stop reason:
+        // 1. AskUserQuestion → pending (user must choose)
+        const lastTool = existing ? existing.lastToolName : null;
+        const isPending = lastTool === 'AskUserQuestion';
+
+        // 2. Check working duration (time since last working state started)
+        const workingStart = existing ? new Date(existing.lastUpdatedAt).getTime() : 0;
+        const workingDuration = (Date.now() - workingStart) / 1000;
+
+        // 3. Check if real work tools were used
+        const msg = (input.last_assistant_message || '').toLowerCase();
+        const hasQuestionPattern = /할까요|진행할까요|선택해|어떤.*방식|어떻게.*할까|원하시|괜찮으시|confirm|proceed|which|choose/i.test(msg);
+
+        if (isPending || hasQuestionPattern) {
+          state.status = 'pending';
+        } else if (workingDuration >= 10) {
+          state.status = 'completed';
+          state.completedAt = now;
+        } else {
+          state.status = 'idle';
+        }
 
         writeStateAtomic(filePath, state);
         break;

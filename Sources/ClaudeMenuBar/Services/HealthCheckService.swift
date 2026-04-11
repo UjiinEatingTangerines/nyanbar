@@ -79,7 +79,7 @@ final class HealthCheckService: ObservableObject {
     }
 
     private func performHealthCheck() {
-        let workingSessions = watcher.sessions.filter { $0.status == .working }
+        let workingSessions = watcher.sessions.filter { $0.status == .working || $0.status == .pending }
 
         for session in workingSessions {
             if let pid = session.pid {

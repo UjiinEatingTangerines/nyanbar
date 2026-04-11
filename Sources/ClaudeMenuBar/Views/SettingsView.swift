@@ -5,7 +5,7 @@ struct SettingsView: View {
     var onReschedule: () -> Void
 
     private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0"
     }
 
     var body: some View {
@@ -13,7 +13,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Health Check
                 settingsCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 6) {
                             Image(systemName: "heart.text.square")
                                 .font(.system(size: 14))
@@ -26,23 +26,35 @@ struct SettingsView: View {
                             .font(.system(size: 11.5))
                             .foregroundStyle(.secondary)
 
-                        VStack(spacing: 6) {
-                            // Row 1: seconds
+                        // Interval rows
+                        VStack(spacing: 5) {
+                            Text("Seconds")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
                             HStack(spacing: 4) {
-                                ForEach([HealthCheckInterval.tenSeconds, .twentySeconds, .thirtySeconds], id: \.id) { interval in
-                                    intervalButton(interval)
-                                }
-                            }
-                            // Row 2: minutes/hours
-                            HStack(spacing: 4) {
-                                ForEach([HealthCheckInterval.fiveMinutes, .thirtyMinutes, .oneHour], id: \.id) { interval in
-                                    intervalButton(interval)
-                                }
+                                intervalButton(.tenSeconds)
+                                intervalButton(.twentySeconds)
+                                intervalButton(.thirtySeconds)
                             }
                         }
-                        .onChange(of: settings.selectedInterval) { _, _ in
-                            onReschedule()
+
+                        VStack(spacing: 5) {
+                            Text("Minutes / Hours")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            HStack(spacing: 4) {
+                                intervalButton(.fiveMinutes)
+                                intervalButton(.thirtyMinutes)
+                                intervalButton(.oneHour)
+                            }
                         }
+                    }
+                    .onChange(of: settings.selectedInterval) { _, _ in
+                        onReschedule()
                     }
                 }
 
@@ -59,7 +71,7 @@ struct SettingsView: View {
 
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 6) {
-                                Text("Claude Code Menu Bar")
+                                Text("NyanBar (Claude Code)")
                                     .font(.system(size: 12))
                                     .foregroundStyle(.secondary)
                                 Text("v\(appVersion)")
@@ -101,13 +113,17 @@ struct SettingsView: View {
             settings.selectedInterval = interval
         } label: {
             Text(interval.displayName)
-                .font(.system(size: 11, weight: isSelected ? .semibold : .regular, design: .monospaced))
-                .foregroundStyle(isSelected ? .primary : .secondary)
+                .font(.system(size: 12, weight: isSelected ? .bold : .medium, design: .monospaced))
+                .foregroundStyle(isSelected ? .white : .primary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
+                .padding(.vertical, 7)
                 .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.06))
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isSelected ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isSelected ? Color.clear : Color.secondary.opacity(0.15), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)

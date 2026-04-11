@@ -124,6 +124,8 @@ struct SessionCardView: View {
         switch session.status {
         case .working:
             Text(RelativeTimeFormatter.durationString(from: session.startedAt))
+        case .pending:
+            Text("🙋 waiting for input")
         case .completed:
             if let completedAt = session.completedAt {
                 Text("done \(RelativeTimeFormatter.string(from: completedAt))")
@@ -146,6 +148,7 @@ struct SessionCardView: View {
     private var dotColor: Color {
         switch session.status {
         case .working: .green
+        case .pending: .orange
         case .completed: .blue
         case .idle: .gray
         case .dead: .red
@@ -154,6 +157,7 @@ struct SessionCardView: View {
 
     private var cardBackground: Color {
         switch session.status {
+        case .pending: Color.orange.opacity(0.05)
         case .dead: Color.red.opacity(0.04)
         default: Color(nsColor: .controlBackgroundColor).opacity(0.4)
         }
@@ -161,6 +165,7 @@ struct SessionCardView: View {
 
     private var hoverBackground: Color {
         switch session.status {
+        case .pending: Color.orange.opacity(0.1)
         case .dead: Color.red.opacity(0.08)
         default: Color.accentColor.opacity(0.08)
         }

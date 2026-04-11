@@ -79,6 +79,7 @@ final class MenuBarIconManager {
     enum IconState: Equatable {
         case idle
         case working(projectName: String)
+        case pending(projectName: String)
         case completed
     }
 
@@ -92,6 +93,7 @@ final class MenuBarIconManager {
 
     func update(state: IconState) {
         stopAnimation()
+        statusItem.button?.alphaValue = 1.0  // Reset from pending pulse
         currentState = state
 
         switch state {
@@ -105,6 +107,11 @@ final class MenuBarIconManager {
             scheduleNextYawn()
             startWorkingAnimation()
             setFixedTitle(truncate(projectName, maxLength: Self.titleFixedLength))
+
+        case .pending(let projectName):
+            isShowingRainbow = false
+            startPendingAnimation()
+            setFixedTitle("🙋 \(truncate(projectName, maxLength: Self.titleFixedLength - 3))")
 
         case .completed:
             isShowingRainbow = true
@@ -415,6 +422,30 @@ final class MenuBarIconManager {
                 self.statusItem.button?.image = Self.createCatLoaf(
                     tailSwing: swing, yawn: self.yawnProgress
                 )
+            }
+        }
+    }
+
+    /// Pending: slow pulse (opacity blink) + gentle tail
+    private func startPendingAnimation() {
+        phase = 0
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.phase += 0.05
+                if self.phase > .pi * 2 { self.phase -= .pi * 2 }
+
+                // Gentle tail sway
+                let swing = sin(self.phase * 0.8) * 0.3
+
+                // Pulse opacity: 0.5 ~ 1.0 (subtle blink to draw attention)
+                let pulse = 0.75 + 0.25 * sin(self.phase * 1.5)
+
+                let img = Self.createCatLoaf(tailSwing: swing)
+                img.isTemplate = false  // disable template to control opacity
+
+                self.statusItem.button?.image = img
+                self.statusItem.button?.alphaValue = CGFloat(pulse)
             }
         }
     }

@@ -55,6 +55,14 @@ struct SessionDashboardView: View {
                 )
 
                 SessionGroupView(
+                    title: "Waiting for Input",
+                    icon: "hand.raised.fill",
+                    color: .orange,
+                    sessions: watcher.pendingSessions,
+                    onFocus: { onFocusSession?($0) }
+                )
+
+                SessionGroupView(
                     title: "Completed",
                     icon: "checkmark.circle.fill",
                     color: .blue,
