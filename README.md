@@ -141,6 +141,8 @@ nyanbar status      # 설치 상태 확인
 | 권한 프롬프트 | 30초 stale-working 감지 | pending |
 | 프로세스 종료 | PID health check | dead |
 | cmux 탭 닫힘 | Surface 유효성 체크 | dead |
+| Hook 없는 세션 | 프로세스 스캔 (`ps`) | 자동 발견 + 추적 |
+| 맥북 잠자기 후 | Wake notification + DispatchSource 재생성 | 자동 복구 |
 
 ---
 

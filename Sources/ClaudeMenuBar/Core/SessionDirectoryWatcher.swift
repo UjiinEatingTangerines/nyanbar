@@ -1,16 +1,18 @@
 import Foundation
 import Combine
+import AppKit
 
 @MainActor
 final class SessionDirectoryWatcher: ObservableObject {
     @Published private(set) var sessions: [SessionState] = []
 
-    private let directoryURL: URL
+    let directoryURL: URL
     private let staleThreshold: TimeInterval
     private var directoryFD: Int32 = -1
     private var dispatchSource: DispatchSourceFileSystemObject?
     private var pollTimer: Timer?
     private let decoder: JSONDecoder
+    private var wakeObserver: Any?
 
     init(
         directoryURL: URL? = nil,
@@ -29,6 +31,7 @@ final class SessionDirectoryWatcher: ObservableObject {
         ensureDirectory()
         setupDirectoryMonitor()
         startPollTimer()
+        observeWakeSleep()
         reload()
     }
 
@@ -36,11 +39,26 @@ final class SessionDirectoryWatcher: ObservableObject {
         dispatchSource?.cancel()
         dispatchSource = nil
         if directoryFD >= 0 {
-            close(directoryFD)
+            Darwin.close(directoryFD)
             directoryFD = -1
         }
         pollTimer?.invalidate()
         pollTimer = nil
+        if let obs = wakeObserver { NotificationCenter.default.removeObserver(obs) }
+    }
+
+    /// Restart file monitoring (called after wake from sleep)
+    func restartMonitoring() {
+        // Tear down old dispatch source
+        dispatchSource?.cancel()
+        dispatchSource = nil
+        if directoryFD >= 0 {
+            Darwin.close(directoryFD)
+            directoryFD = -1
+        }
+        // Recreate
+        setupDirectoryMonitor()
+        reload()
     }
 
     func reload() {
@@ -206,10 +224,22 @@ final class SessionDirectoryWatcher: ObservableObject {
     }
 
     private func startPollTimer() {
-        // Safety-net poll every 30s (DispatchSource handles normal case)
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+        // Poll every 5s — lightweight (reads a few small JSON files)
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.reload()
+            }
+        }
+    }
+
+    private func observeWakeSleep() {
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.restartMonitoring()
             }
         }
     }

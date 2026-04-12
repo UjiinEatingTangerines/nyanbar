@@ -117,8 +117,71 @@ final class HealthCheckService: ObservableObject {
             }
         }
 
+        // 4. Discover untracked Claude sessions via process scan
+        discoverNewSessions()
+
         watcher.reload()
         garbageCollect()
+    }
+
+    /// Scan running processes to find Claude sessions not tracked by hooks
+    private func discoverNewSessions() {
+        let existingPids = Set(watcher.sessions.compactMap(\.pid))
+
+        // Also check session files on disk (watcher.sessions may filter stale ones)
+        let diskPids = readDiskSessionPids()
+        let allKnownPids = existingPids.union(diskPids)
+
+        let untracked = ProcessScanner.findUntrackedSessions(existingPids: allKnownPids)
+
+        let now = Date()
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .prettyPrinted
+
+        for session in untracked {
+            let state = SessionState(
+                schemaVersion: 1,
+                sessionId: "pid-\(session.pid)",
+                status: .working,
+                projectName: session.projectName,
+                workingDirectory: session.workingDirectory,
+                startedAt: now,
+                lastUpdatedAt: now,
+                lastMessage: nil,
+                lastToolName: nil,
+                completedAt: nil,
+                diedAt: nil,
+                pid: session.pid,
+                terminalApp: session.terminalApp,
+                cmuxPanelId: nil,
+                cmuxTabId: nil,
+                cmuxSurfaceId: nil
+            )
+
+            watcher.writeState(state)
+        }
+    }
+
+    /// Read PIDs from session files on disk (bypasses stale filter)
+    private func readDiskSessionPids() -> Set<Int> {
+        let dir = watcher.directoryURL
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles
+        ) else { return [] }
+
+        var pids = Set<Int>()
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        for url in files where url.pathExtension == "json" {
+            if let data = try? Data(contentsOf: url),
+               let state = try? decoder.decode(SessionState.self, from: data),
+               let pid = state.pid {
+                pids.insert(pid)
+            }
+        }
+        return pids
     }
 
     private func markAsDead(_ session: SessionState) {
