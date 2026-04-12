@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 /// Scans running processes to discover Claude Code sessions
-/// that weren't tracked by hooks (e.g., cmux-spawned sessions).
+/// that weren't tracked by hooks. Optimized for minimal shell spawning.
 struct ProcessScanner {
 
     struct DiscoveredSession {
@@ -12,27 +12,28 @@ struct ProcessScanner {
         let terminalApp: String?
     }
 
-    /// Find all running Claude Code processes and return untracked ones
+    /// Find all running Claude Code processes and return untracked ones.
+    /// Uses a single `ps` call + selective `lsof` only for new PIDs.
     static func findUntrackedSessions(existingPids: Set<Int>) -> [DiscoveredSession] {
-        let claudeProcesses = findClaudeProcesses()
+        // Single ps call to get all processes with pid, ppid, command
+        let allProcs = getAllProcesses()
+        let claudeProcs = allProcs.filter { isClaudeProcess($0.command) }
+
         var untracked: [DiscoveredSession] = []
 
-        for (pid, command) in claudeProcesses {
-            // Skip if already tracked
-            guard !existingPids.contains(pid) else { continue }
+        for proc in claudeProcs {
+            guard !existingPids.contains(proc.pid) else { continue }
+            guard isMainClaudeProcess(command: proc.command) else { continue }
 
-            // Skip child/helper processes — only track main claude processes
-            guard isMainClaudeProcess(command: command) else { continue }
-
-            // Get working directory
-            let cwd = getProcessCwd(pid: pid) ?? "/"
+            // Only call lsof for truly new PIDs (expensive)
+            let cwd = getProcessCwd(pid: proc.pid) ?? "/"
             let projectName = URL(fileURLWithPath: cwd).lastPathComponent
 
-            // Identify terminal from parent process chain
-            let terminal = identifyTerminal(pid: pid)
+            // Walk parent chain using cached process table (no extra ps calls)
+            let terminal = identifyTerminal(pid: proc.pid, processTable: allProcs)
 
             untracked.append(DiscoveredSession(
-                pid: pid,
+                pid: proc.pid,
                 projectName: projectName,
                 workingDirectory: cwd,
                 terminalApp: terminal
@@ -42,87 +43,72 @@ struct ProcessScanner {
         return untracked
     }
 
-    /// Check which tracked PIDs are still alive
-    static func validatePids(_ pids: [Int]) -> [Int: Bool] {
-        var results: [Int: Bool] = [:]
-        for pid in pids {
-            let result = kill(pid_t(pid), 0)
-            results[pid] = (result == 0 || errno == EPERM)
-        }
-        return results
+    // MARK: - Process Table (single ps call)
+
+    struct ProcessInfo {
+        let pid: Int
+        let ppid: Int
+        let command: String
     }
 
-    // MARK: - Private
+    /// Single `ps` call to build full process table
+    private static func getAllProcesses() -> [ProcessInfo] {
+        guard let output = runShell("ps -eo pid,ppid,command") else { return [] }
 
-    /// Run `ps` to find all claude processes
-    private static func findClaudeProcesses() -> [(pid: Int, command: String)] {
-        guard let output = runShell("ps -eo pid,command") else { return [] }
-
-        var results: [(Int, String)] = []
-        for line in output.split(separator: "\n") {
+        var results: [ProcessInfo] = []
+        for line in output.split(separator: "\n").dropFirst() { // skip header
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            // Parse: "12345 /path/to/claude ..."
-            let parts = trimmed.split(separator: " ", maxSplits: 1)
-            guard parts.count == 2,
-                  let pid = Int(parts[0]) else { continue }
-            let command = String(parts[1])
-
-            // Match claude binary
-            if command.contains("/claude") || command.hasPrefix("claude ") || command == "claude" {
-                results.append((pid, command))
-            }
+            let parts = trimmed.split(separator: " ", maxSplits: 2)
+            guard parts.count >= 2,
+                  let pid = Int(parts[0]),
+                  let ppid = Int(parts[1]) else { continue }
+            let command = parts.count > 2 ? String(parts[2]) : ""
+            results.append(ProcessInfo(pid: pid, ppid: ppid, command: command))
         }
         return results
     }
 
-    /// Only track main claude processes, not helpers/workers
+    private static func isClaudeProcess(_ command: String) -> Bool {
+        command.contains("/claude") || command.hasPrefix("claude ") || command == "claude"
+    }
+
     private static func isMainClaudeProcess(command: String) -> Bool {
-        // Main process patterns:
-        // - "/path/to/claude" (bare)
-        // - "/path/to/claude --session-id ..."
-        // - "claude --dangerously-skip-permissions"
-        // Skip node/hook child processes
         if command.contains("node ") { return false }
         if command.contains("menubar-session-update") { return false }
         if command.contains("run-with-flags") { return false }
+        if command.contains("ClaudeMenuBar") { return false }
         return true
     }
 
-    /// Get process working directory via lsof
+    /// Get cwd via lsof (only for new PIDs)
     private static func getProcessCwd(pid: Int) -> String? {
-        guard let output = runShell("lsof -p \(pid) -Fn 2>/dev/null | grep '^n/' | head -1") else {
-            return nil
-        }
-        // lsof output: "n/path/to/dir"
-        let path = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        if path.hasPrefix("n") {
-            return String(path.dropFirst())
+        guard let output = runShell("lsof -p \(pid) -d cwd -Fn 2>/dev/null") else { return nil }
+        for line in output.split(separator: "\n") {
+            let s = String(line)
+            if s.hasPrefix("n/") { return String(s.dropFirst()) }
         }
         return nil
     }
 
-    /// Walk parent process chain to identify terminal app
-    private static func identifyTerminal(pid: Int) -> String? {
+    /// Walk parent chain using cached process table (zero extra shell calls)
+    private static func identifyTerminal(pid: Int, processTable: [ProcessInfo]) -> String? {
+        let pidMap = Dictionary(processTable.map { ($0.pid, $0) }, uniquingKeysWith: { first, _ in first })
         var currentPid = pid
         var depth = 0
 
         while currentPid > 1 && depth < 10 {
-            // Get parent PID
-            guard let ppidStr = runShell("ps -o ppid= -p \(currentPid)"),
-                  let ppid = Int(ppidStr.trimmingCharacters(in: .whitespaces)) else {
-                break
-            }
+            guard let proc = pidMap[currentPid] else { break }
+            let ppid = proc.ppid
 
-            // Check parent's executable path
-            if let path = getExecutablePath(pid: ppid) {
-                let lower = path.lowercased()
-                if lower.contains("cmux") { return "cmux" }
-                if lower.contains("iterm") { return "iTerm2" }
-                if lower.contains("terminal.app") { return "Apple_Terminal" }
-                if lower.contains("ghostty") { return "ghostty" }
-                if lower.contains("warp") { return "WarpTerminal" }
-                if lower.contains("code") && lower.contains("visual") { return "vscode" }
-                if lower.contains("intellij") || lower.contains("jetbrains") { return "com.jetbrains.intellij" }
+            if let parent = pidMap[ppid] {
+                let cmd = parent.command.lowercased()
+                if cmd.contains("cmux") { return "cmux" }
+                if cmd.contains("iterm") { return "iTerm2" }
+                if cmd.contains("terminal") && cmd.contains("apple") { return "Apple_Terminal" }
+                if cmd.contains("ghostty") { return "ghostty" }
+                if cmd.contains("warp") { return "WarpTerminal" }
+                if cmd.contains("code") && (cmd.contains("visual") || cmd.contains("electron")) { return "vscode" }
+                if cmd.contains("intellij") || cmd.contains("jetbrains") { return "com.jetbrains.intellij" }
             }
 
             currentPid = ppid
@@ -130,17 +116,6 @@ struct ProcessScanner {
         }
 
         return nil
-    }
-
-    /// Get executable path for a PID
-    private static func getExecutablePath(pid: Int) -> String? {
-        // PROC_PIDPATHINFO_MAXSIZE = 4 * MAXPATHLEN = 4 * 1024 = 4096
-        let bufSize = 4096
-        let pathBuffer = UnsafeMutablePointer<CChar>.allocate(capacity: bufSize)
-        defer { pathBuffer.deallocate() }
-        let result = proc_pidpath(pid_t(pid), pathBuffer, UInt32(bufSize))
-        guard result > 0 else { return nil }
-        return String(cString: pathBuffer)
     }
 
     private static func runShell(_ command: String) -> String? {

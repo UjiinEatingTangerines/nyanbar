@@ -27,6 +27,8 @@ final class HealthCheckService: ObservableObject {
     }
 
     private static let garbageCollectAge: TimeInterval = 24 * 60 * 60
+    nonisolated(unsafe) private static var healthCheckCount = 0
+    nonisolated private static let scanEveryNChecks = 5
 
     init(watcher: SessionDirectoryWatcher, settings: SettingsStore) {
         self.watcher = watcher
@@ -61,11 +63,14 @@ final class HealthCheckService: ObservableObject {
         nextCheckAt = Date().addingTimeInterval(interval)
 
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.performHealthCheck()
-                self?.nextCheckAt = Date().addingTimeInterval(self?.settings.healthCheckSeconds ?? 1800)
-                // Trigger flash after reload is done
-                self?.onHealthCheckDone?()
+            // Run health check on background thread to avoid blocking UI
+            DispatchQueue.global(qos: .utility).async {
+                self?.performHealthCheckBackground()
+                DispatchQueue.main.async {
+                    self?.watcher.reload()
+                    self?.nextCheckAt = Date().addingTimeInterval(self?.settings.healthCheckSeconds ?? 1800)
+                    self?.onHealthCheckDone?()
+                }
             }
         }
     }
@@ -80,191 +85,114 @@ final class HealthCheckService: ObservableObject {
         }
     }
 
-    private func performHealthCheck() {
-        // Check all non-dead sessions
-        for session in watcher.sessions where session.status != .dead {
-            // 1. PID check — if process died, mark as dead
-            if let pid = session.pid {
-                if !isProcessAlive(pid: pid) {
-                    markAsDead(session)
-                    continue
-                }
-            }
-
-            // 2. For working/pending without PID, use staleness
-            if session.pid == nil && (session.status == .working || session.status == .pending) {
-                let stalenessThreshold = settings.healthCheckSeconds * 2
-                let elapsed = Date().timeIntervalSince(session.lastUpdatedAt)
-                if elapsed > stalenessThreshold {
-                    markAsDead(session)
-                    continue
-                }
-            }
-
-            // 3. Validate cmux surface — if surface is gone, clear it
-            if session.cmuxSurfaceId != nil {
-                if !isCmuxSurfaceAlive(session.cmuxSurfaceId!) {
-                    var updated = session
-                    updated.cmuxSurfaceId = nil
-                    updated.cmuxPanelId = nil
-                    // If it was active and surface is gone, mark as dead
-                    if session.status == .working || session.status == .pending {
-                        updated.status = .dead
-                        updated.diedAt = Date()
-                    }
-                    watcher.writeState(updated)
-                }
-            }
-        }
-
-        // 4. Discover untracked Claude sessions via process scan
-        discoverNewSessions()
-
-        watcher.reload()
-        garbageCollect()
-    }
-
-    /// Scan running processes to find Claude sessions not tracked by hooks
-    private func discoverNewSessions() {
-        let existingPids = Set(watcher.sessions.compactMap(\.pid))
-
-        // Also check session files on disk (watcher.sessions may filter stale ones)
-        let diskPids = readDiskSessionPids()
-        let allKnownPids = existingPids.union(diskPids)
-
-        let untracked = ProcessScanner.findUntrackedSessions(existingPids: allKnownPids)
-
-        let now = Date()
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = .prettyPrinted
-
-        for session in untracked {
-            let state = SessionState(
-                schemaVersion: 1,
-                sessionId: "pid-\(session.pid)",
-                status: .working,
-                projectName: session.projectName,
-                workingDirectory: session.workingDirectory,
-                startedAt: now,
-                lastUpdatedAt: now,
-                lastMessage: nil,
-                lastToolName: nil,
-                completedAt: nil,
-                diedAt: nil,
-                pid: session.pid,
-                terminalApp: session.terminalApp,
-                cmuxPanelId: nil,
-                cmuxTabId: nil,
-                cmuxSurfaceId: nil
-            )
-
-            watcher.writeState(state)
-        }
-    }
-
-    /// Read PIDs from session files on disk (bypasses stale filter)
-    private func readDiskSessionPids() -> Set<Int> {
-        let dir = watcher.directoryURL
-        guard let files = try? FileManager.default.contentsOfDirectory(
-            at: dir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles
-        ) else { return [] }
-
-        var pids = Set<Int>()
+    /// Called from background thread — no UI access, file I/O only
+    nonisolated private func performHealthCheckBackground() {
+        // Read sessions from disk directly (avoid MainActor)
+        let sessionsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/menubar-sessions")
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
 
-        for url in files where url.pathExtension == "json" {
-            if let data = try? Data(contentsOf: url),
-               let state = try? decoder.decode(SessionState.self, from: data),
-               let pid = state.pid {
-                pids.insert(pid)
-            }
-        }
-        return pids
-    }
-
-    private func markAsDead(_ session: SessionState) {
-        var updated = session
-        updated.status = .dead
-        updated.diedAt = Date()
-        watcher.writeState(updated)
-    }
-
-    /// Check if a cmux surface UUID is still valid
-    private func isCmuxSurfaceAlive(_ surfaceId: String) -> Bool {
-        guard TerminalController.isCmuxAvailable else { return true } // can't verify, assume alive
-
-        let cmuxPath = "/Applications/cmux.app/Contents/Resources/bin/cmux"
-        guard FileManager.default.isExecutableFile(atPath: cmuxPath) else { return true }
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: cmuxPath)
-        task.arguments = ["identify", "--surface", surfaceId]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-            guard task.terminationStatus == 0 else { return false }
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let caller = json["caller"] as? [String: Any],
-               let ref = caller["surface_ref"] as? String,
-               !ref.isEmpty {
-                return true
-            }
-            return false
-        } catch {
-            return true // can't verify, assume alive
-        }
-    }
-
-    private func garbageCollect() {
-        let now = Date()
-
-        // Move stale pending sessions to idle (10 min without update)
-        for session in watcher.sessions where session.status == .pending {
-            let elapsed = now.timeIntervalSince(session.lastUpdatedAt)
-            if elapsed > 600 {
-                var updated = session
-                updated.status = .idle
-                watcher.writeState(updated)
-            }
-        }
-
-        // GC: scan directory directly (watcher.sessions excludes stale files)
-        let sessionsDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/menubar-sessions")
         guard let files = try? FileManager.default.contentsOfDirectory(
             at: sessionsDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles
         ) else { return }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .prettyPrinted
+
+        var existingPids = Set<Int>()
 
         for fileURL in files where fileURL.pathExtension == "json" {
             guard let data = try? Data(contentsOf: fileURL),
-                  let session = try? decoder.decode(SessionState.self, from: data) else {
-                continue
+                  var session = try? decoder.decode(SessionState.self, from: data) else { continue }
+
+            if let pid = session.pid { existingPids.insert(pid) }
+            guard session.status != .dead else { continue }
+
+            // 1. PID check
+            if let pid = session.pid {
+                let alive = (kill(pid_t(pid), 0) == 0 || errno == EPERM)
+                if !alive {
+                    session.status = .dead
+                    session.diedAt = Date()
+                    if let encoded = try? encoder.encode(session) {
+                        try? encoded.write(to: fileURL, options: .atomic)
+                    }
+                    continue
+                }
             }
 
-            // Only GC non-working sessions
-            guard session.status != .working else { continue }
+            // 2. Staleness for PID-less sessions
+            if session.pid == nil && (session.status == .working || session.status == .pending) {
+                let threshold: TimeInterval = 60  // 1 minute without PID
+                if Date().timeIntervalSince(session.lastUpdatedAt) > threshold {
+                    session.status = .dead
+                    session.diedAt = Date()
+                    if let encoded = try? encoder.encode(session) {
+                        try? encoded.write(to: fileURL, options: .atomic)
+                    }
+                    continue
+                }
+            }
 
-            let referenceDate = session.diedAt ?? session.completedAt ?? session.lastUpdatedAt
-            if now.timeIntervalSince(referenceDate) > Self.garbageCollectAge {
+            // 3. Stale pending → idle (10 min)
+            if session.status == .pending {
+                if Date().timeIntervalSince(session.lastUpdatedAt) > 600 {
+                    session.status = .idle
+                    if let encoded = try? encoder.encode(session) {
+                        try? encoded.write(to: fileURL, options: .atomic)
+                    }
+                }
+            }
+        }
+
+        // 4. Process scan (every 5th check)
+        Self.healthCheckCount += 1
+        if Self.healthCheckCount % Self.scanEveryNChecks == 0 {
+            let untracked = ProcessScanner.findUntrackedSessions(existingPids: existingPids)
+            let now = Date()
+            for discovered in untracked {
+                let state = SessionState(
+                    schemaVersion: 1,
+                    sessionId: "pid-\(discovered.pid)",
+                    status: .working,
+                    projectName: discovered.projectName,
+                    workingDirectory: discovered.workingDirectory,
+                    startedAt: now,
+                    lastUpdatedAt: now,
+                    lastMessage: nil,
+                    lastToolName: nil,
+                    completedAt: nil,
+                    diedAt: nil,
+                    pid: discovered.pid,
+                    terminalApp: discovered.terminalApp,
+                    cmuxPanelId: nil,
+                    cmuxTabId: nil,
+                    cmuxSurfaceId: nil
+                )
+                if let encoded = try? encoder.encode(state) {
+                    let safeId = state.sessionId.replacingOccurrences(
+                        of: "[^a-zA-Z0-9_-]", with: "_", options: .regularExpression
+                    )
+                    let url = sessionsDir.appendingPathComponent("\(safeId).json")
+                    try? encoded.write(to: url, options: .atomic)
+                }
+            }
+        }
+
+        // 5. GC: delete 24h+ old files
+        let gcAge: TimeInterval = 24 * 60 * 60
+        let now = Date()
+        for fileURL in files where fileURL.pathExtension == "json" {
+            guard let data = try? Data(contentsOf: fileURL),
+                  let session = try? decoder.decode(SessionState.self, from: data) else { continue }
+            guard session.status != .working else { continue }
+            let ref = session.diedAt ?? session.completedAt ?? session.lastUpdatedAt
+            if now.timeIntervalSince(ref) > gcAge {
                 try? FileManager.default.removeItem(at: fileURL)
             }
         }
     }
 
-    private func isProcessAlive(pid: Int) -> Bool {
-        let result = kill(pid_t(pid), 0)
-        if result == 0 { return true }
-        return errno == EPERM
-    }
 }
