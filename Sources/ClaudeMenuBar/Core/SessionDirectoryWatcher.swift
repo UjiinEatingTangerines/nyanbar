@@ -224,8 +224,8 @@ final class SessionDirectoryWatcher: ObservableObject {
     }
 
     private func startPollTimer() {
-        // Poll every 5s — lightweight (reads a few small JSON files)
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Poll every 10s — DispatchSource handles most changes instantly
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.reload()
             }

@@ -395,10 +395,11 @@ final class MenuBarIconManager {
         phase = 0
         spinnerTickCount = 0
         setFixedTitle(currentSpinnerMessage)
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        // Idle: 0.3s interval (~3fps) — very low CPU, tail barely moves
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
-                self.phase += 0.04
+                self.phase += 0.08
                 if self.phase > .pi * 2 { self.phase -= .pi * 2 }
                 self.tickYawn()
                 self.tickSpinner()
@@ -417,7 +418,7 @@ final class MenuBarIconManager {
         setFixedTitle("💤 zzZ...")
         let img = Self.createCatLoaf(customColor: catColor)
         statusItem.button?.image = img
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.phase += 0.02
@@ -432,7 +433,7 @@ final class MenuBarIconManager {
     /// Working: active tail sway + periodic yawn
     private func startWorkingAnimation() {
         phase = 0
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.phase += 0.08
@@ -450,7 +451,7 @@ final class MenuBarIconManager {
     /// Pending: slow pulse (opacity blink) + gentle tail — keeps template mode
     private func startPendingAnimation() {
         phase = 0
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.phase += 0.05
@@ -470,7 +471,7 @@ final class MenuBarIconManager {
     private func startRainbowAnimation() {
         rainbowPhase = 0
         phase = 0
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.rainbowPhase += 0.012
@@ -490,7 +491,7 @@ final class MenuBarIconManager {
     private func startHealthCheckFlash() {
         phase = 0
         var elapsed: CGFloat = 0
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.phase += 0.04

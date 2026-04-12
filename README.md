@@ -143,7 +143,7 @@ nyanbar status      # 설치 상태 확인
 | cmux 탭 닫힘 | Surface 유효성 체크 | dead |
 | Hook 없는 세션 | 프로세스 스캔 (`ps`) | 자동 발견 + 추적 |
 | 맥북 잠자기 후 | Wake notification + DispatchSource 재생성 | 자동 복구 |
-| UI 프리즈 방지 | 헬스체크 전체를 백그라운드 스레드에서 실행 | 메인 스레드 블로킹 없음 |
+| UI 프리즈 방지 | 헬스체크 백그라운드 + 상태별 적응형 FPS (idle 3fps, working 5fps) | CPU ~4%, 메인 스레드 블로킹 없음 |
 
 ---
 
