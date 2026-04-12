@@ -163,21 +163,38 @@ final class HealthCheckService: ObservableObject {
     private func garbageCollect() {
         let now = Date()
 
-        // Move stale pending/idle sessions to idle (10 min without update)
+        // Move stale pending sessions to idle (10 min without update)
         for session in watcher.sessions where session.status == .pending {
             let elapsed = now.timeIntervalSince(session.lastUpdatedAt)
-            if elapsed > 600 { // 10 minutes
+            if elapsed > 600 {
                 var updated = session
                 updated.status = .idle
                 watcher.writeState(updated)
             }
         }
 
-        for session in watcher.sessions {
-            guard session.status == .dead || session.status == .completed || session.status == .idle else { continue }
+        // GC: scan directory directly (watcher.sessions excludes stale files)
+        let sessionsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/menubar-sessions")
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: sessionsDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles
+        ) else { return }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        for fileURL in files where fileURL.pathExtension == "json" {
+            guard let data = try? Data(contentsOf: fileURL),
+                  let session = try? decoder.decode(SessionState.self, from: data) else {
+                continue
+            }
+
+            // Only GC non-working sessions
+            guard session.status != .working else { continue }
+
             let referenceDate = session.diedAt ?? session.completedAt ?? session.lastUpdatedAt
             if now.timeIntervalSince(referenceDate) > Self.garbageCollectAge {
-                watcher.deleteSessionFile(sessionId: session.sessionId)
+                try? FileManager.default.removeItem(at: fileURL)
             }
         }
     }
