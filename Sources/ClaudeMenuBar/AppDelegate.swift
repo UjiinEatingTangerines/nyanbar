@@ -158,7 +158,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let completed = sessions.filter { $0.status == .completed }
         let completedIds = Set(completed.map(\.sessionId))
-        let newlyCompleted = completedIds.subtracting(previousCompletedIds)
+
+        // Detect newly completed: either new ID or recently completed (within 10s)
+        let recentlyCompleted = completed.filter {
+            guard let completedAt = $0.completedAt else { return false }
+            return Date().timeIntervalSince(completedAt) < 10
+        }
+        let newById = completedIds.subtracting(previousCompletedIds)
+        let newByTime = Set(recentlyCompleted.map(\.sessionId)).subtracting(previousCompletedIds)
+        let newlyCompleted = newById.union(newByTime)
 
         // Always keep tracking set in sync
         previousCompletedIds = completedIds

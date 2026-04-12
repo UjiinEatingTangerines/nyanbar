@@ -134,7 +134,7 @@ nyanbar status      # 설치 상태 확인
 
 | 상황 | 감지 방법 | 결과 |
 |------|----------|------|
-| 10초+ 작업 후 완료 | Stop hook + duration check | ✅ 무지개 + 사운드 |
+| 10초+ 작업 후 완료 | Stop hook + duration check + 10s 시간 기반 감지 | ✅ 무지개 + 사운드 |
 | 짧은 응답/에러 | Stop hook + duration < 10s | idle (무지개 X) |
 | AskUserQuestion | Stop hook + tool name check | pending (🙋 입력 대기) |
 | 질문 패턴 | 메시지 패턴 매칭 | pending |
