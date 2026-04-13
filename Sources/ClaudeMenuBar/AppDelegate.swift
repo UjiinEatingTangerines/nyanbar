@@ -74,7 +74,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         healthCheck.pauseCountdown()  // popover starts closed — no need to tick
         observeWakeSleep()
 
-        timestampRefreshTimer = Self.scheduleTimestampRefresh(watcher: watcher)
+        // Popover starts closed — defer timestamp refresh timer until first show.
+        // Saves 2,880 no-op SwiftUI re-evaluations per day when the user never
+        // opens the popover.
 
         // Snapshot current completed sessions to avoid false triggers on startup
         previousCompletedIds = Set(
@@ -181,9 +183,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// Called after stabilization delay — restarts timers and refreshes state.
     private func handleWakeDeferred() {
-        // Restart timestamp refresh timer
+        // Restart timestamp refresh timer only if the popover is currently
+        // visible. After sleep/wake, the popover is normally closed, so we
+        // skip restarting the timer until the user next opens the popover.
         timestampRefreshTimer?.invalidate()
-        timestampRefreshTimer = Self.scheduleTimestampRefresh(watcher: watcher)
+        timestampRefreshTimer = nil
+        if popover.isShown {
+            resumeTimestampRefresh()
+        }
         // Restart health check timers
         healthCheck.rescheduleAfterWake()
         // Refresh icon state based on current sessions
@@ -293,13 +300,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     nonisolated func popoverDidShow(_ notification: Notification) {
         Task { @MainActor in
             self.healthCheck.resumeCountdown()
+            self.resumeTimestampRefresh()
         }
     }
 
     nonisolated func popoverDidClose(_ notification: Notification) {
         Task { @MainActor in
             self.healthCheck.pauseCountdown()
+            self.pauseTimestampRefresh()
         }
+    }
+
+    /// Start the timestamp refresh timer if it isn't already running.
+    /// Only needed while the popover is visible to the user.
+    private func resumeTimestampRefresh() {
+        guard timestampRefreshTimer == nil else { return }
+        timestampRefreshTimer = Self.scheduleTimestampRefresh(watcher: watcher)
+    }
+
+    /// Stop the timestamp refresh timer while the popover is hidden.
+    private func pauseTimestampRefresh() {
+        timestampRefreshTimer?.invalidate()
+        timestampRefreshTimer = nil
     }
 
     // MARK: - Icon helpers (continued)
