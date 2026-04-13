@@ -142,6 +142,7 @@ nyanbar status      # Check installation status
 | AskUserQuestion | Stop hook + tool name check | pending (🙋 waiting for input) |
 | Question pattern | Message pattern match | pending |
 | Permission prompt | 30s stale-working detection | pending |
+| Idle reminder after Stop | Notification only flips `working`/`pending` → `pending` (never overrides `completed`/`idle`) | no phantom pending |
 | Process exited | PID health check | dead |
 | cmux tab closed | Surface validity check | dead |
 | Session without hook | Process scan (`ps`) | auto-discovered + tracked |

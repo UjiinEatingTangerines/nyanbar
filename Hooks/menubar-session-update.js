@@ -217,10 +217,14 @@ function run(raw) {
           cmuxSurfaceId
         };
 
-        // Track when this working cycle started (reset on non-working → working transition)
+        // Track when this working cycle started (reset on non-working → working transition).
+        // Also clear stale completedAt/diedAt from a previous cycle so the menubar
+        // doesn't carry over old completion timestamps into a new working cycle.
         const wasWorking = existing && existing.status === 'working';
         if (!wasWorking) {
           state.workingStartedAt = now;
+          state.completedAt = null;
+          state.diedAt = null;
         }
 
         state.status = 'working';
@@ -287,16 +291,28 @@ function run(raw) {
       }
 
       case 'notification': {
-        // Notification = Claude is waiting for user attention
-        // This is the definitive "pending" signal
+        // Claude Code's Notification hook fires for various reasons:
+        //   1. Permission prompts (real input request) → pending
+        //   2. Mid-task attention requests → pending
+        //   3. Idle reminders after Stop ("you have been idle...") → NOT pending
+        //
+        // Conservative rule: only transition to pending if currently working
+        // (or already pending — refresh timestamp). Leave completed/idle/dead
+        // alone, since notification after those is almost always an idle
+        // reminder, not a real input request.
         if (existing) {
-          existing.status = 'pending';
-          existing.lastUpdatedAt = now;
-          if (!existing.pid) existing.pid = claudePid;
-          if (!existing.terminalApp && terminalApp) existing.terminalApp = terminalApp;
-          if (!existing.cmuxPanelId && cmuxPanelId) existing.cmuxPanelId = cmuxPanelId;
-          writeStateAtomic(filePath, existing);
+          if (existing.status === 'working' || existing.status === 'pending') {
+            existing.status = 'pending';
+            existing.lastUpdatedAt = now;
+            if (!existing.pid) existing.pid = claudePid;
+            if (!existing.terminalApp && terminalApp) existing.terminalApp = terminalApp;
+            if (!existing.cmuxPanelId && cmuxPanelId) existing.cmuxPanelId = cmuxPanelId;
+            writeStateAtomic(filePath, existing);
+          }
+          // else: skip — don't override completed/idle/dead with phantom pending
         } else {
+          // No prior state: notification is the first signal we see.
+          // Default to pending since a notification implies user attention needed.
           const state = {
             schemaVersion: 1,
             sessionId,
