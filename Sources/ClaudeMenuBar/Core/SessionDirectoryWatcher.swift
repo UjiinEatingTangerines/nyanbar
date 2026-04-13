@@ -11,6 +11,7 @@ final class SessionDirectoryWatcher: ObservableObject {
     private var directoryFD: Int32 = -1
     private var dispatchSource: DispatchSourceFileSystemObject?
     private var pollTimer: Timer?
+    private var reloadDebounceTimer: Timer?
     private let decoder: JSONDecoder
     private var wakeObserver: Any?
 
@@ -44,6 +45,8 @@ final class SessionDirectoryWatcher: ObservableObject {
         }
         pollTimer?.invalidate()
         pollTimer = nil
+        reloadDebounceTimer?.invalidate()
+        reloadDebounceTimer = nil
         if let obs = wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(obs) }
     }
 
@@ -63,6 +66,16 @@ final class SessionDirectoryWatcher: ObservableObject {
         // Recreate dispatch source
         setupDirectoryMonitor()
         reload()
+    }
+
+    /// Debounce rapid filesystem events into a single reload (0.3s window).
+    private func scheduleReload() {
+        reloadDebounceTimer?.invalidate()
+        reloadDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.reload()
+            }
+        }
     }
 
     func reload() {
@@ -216,12 +229,14 @@ final class SessionDirectoryWatcher: ObservableObject {
         )
 
         source.setEventHandler { [weak self] in
-            self?.reload()
+            self?.scheduleReload()
         }
 
-        source.setCancelHandler { [fd] in
-            Darwin.close(fd)
-        }
+        // No cancel handler — fd is closed explicitly in restartMonitoring/stopWatching.
+        // A cancel handler here would race: it runs asynchronously after cancel(),
+        // so if restartMonitoring() closes the fd and opens a new one before the
+        // handler fires, the OS may reuse the same fd number, and the handler would
+        // close the NEW fd — silently killing the file monitor.
 
         source.resume()
         dispatchSource = source

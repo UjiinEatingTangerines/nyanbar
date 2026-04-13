@@ -144,6 +144,8 @@ nyanbar status      # 설치 상태 확인
 | Hook 없는 세션 | 프로세스 스캔 (`ps`) | 자동 발견 + 추적 |
 | 맥북 잠자기 후 | Sleep/Wake notification + 팬텀 팝오버 해제 + 전체 타이머 재시작 + 버튼 재검증 | 자동 복구 |
 | UI 프리즈 방지 | 헬스체크 백그라운드 + 상태별 적응형 FPS (idle 3fps, working 5fps) | CPU ~4%, 메인 스레드 블로킹 없음 |
+| 빠른 파일 변경 | DispatchSource 이벤트 0.3s debounce | reload 폭풍 방지 |
+| 리소스 효율 | 헬스체크 단일 패스 I/O + rainbow 20fps 최적화 | 메모리/CPU 절감 |
 
 ---
 

@@ -113,12 +113,25 @@ final class HealthCheckService: ObservableObject {
         encoder.outputFormatting = .prettyPrinted
 
         var existingPids = Set<Int>()
+        let gcAge: TimeInterval = 24 * 60 * 60
+        let now = Date()
 
+        // Single pass: health checks + GC (reads each file only once)
         for fileURL in files where fileURL.pathExtension == "json" {
             guard let data = try? Data(contentsOf: fileURL),
                   var session = try? decoder.decode(SessionState.self, from: data) else { continue }
 
             if let pid = session.pid { existingPids.insert(pid) }
+
+            // GC: delete 24h+ old non-working sessions
+            if session.status != .working {
+                let ref = session.diedAt ?? session.completedAt ?? session.lastUpdatedAt
+                if now.timeIntervalSince(ref) > gcAge {
+                    try? FileManager.default.removeItem(at: fileURL)
+                    continue
+                }
+            }
+
             guard session.status != .dead else { continue }
 
             // 1. PID check
@@ -126,7 +139,7 @@ final class HealthCheckService: ObservableObject {
                 let alive = (kill(pid_t(pid), 0) == 0 || errno == EPERM)
                 if !alive {
                     session.status = .dead
-                    session.diedAt = Date()
+                    session.diedAt = now
                     if let encoded = try? encoder.encode(session) {
                         try? encoded.write(to: fileURL, options: .atomic)
                     }
@@ -137,9 +150,9 @@ final class HealthCheckService: ObservableObject {
             // 2. Staleness for PID-less sessions
             if session.pid == nil && (session.status == .working || session.status == .pending) {
                 let threshold: TimeInterval = 60  // 1 minute without PID
-                if Date().timeIntervalSince(session.lastUpdatedAt) > threshold {
+                if now.timeIntervalSince(session.lastUpdatedAt) > threshold {
                     session.status = .dead
-                    session.diedAt = Date()
+                    session.diedAt = now
                     if let encoded = try? encoder.encode(session) {
                         try? encoded.write(to: fileURL, options: .atomic)
                     }
@@ -149,7 +162,7 @@ final class HealthCheckService: ObservableObject {
 
             // 3. Stale pending → idle (10 min)
             if session.status == .pending {
-                if Date().timeIntervalSince(session.lastUpdatedAt) > 600 {
+                if now.timeIntervalSince(session.lastUpdatedAt) > 600 {
                     session.status = .idle
                     if let encoded = try? encoder.encode(session) {
                         try? encoded.write(to: fileURL, options: .atomic)
@@ -162,7 +175,6 @@ final class HealthCheckService: ObservableObject {
         Self.healthCheckCount += 1
         if Self.healthCheckCount % Self.scanEveryNChecks == 0 {
             let untracked = ProcessScanner.findUntrackedSessions(existingPids: existingPids)
-            let now = Date()
             for discovered in untracked {
                 let state = SessionState(
                     schemaVersion: 1,
@@ -189,19 +201,6 @@ final class HealthCheckService: ObservableObject {
                     let url = sessionsDir.appendingPathComponent("\(safeId).json")
                     try? encoded.write(to: url, options: .atomic)
                 }
-            }
-        }
-
-        // 5. GC: delete 24h+ old files
-        let gcAge: TimeInterval = 24 * 60 * 60
-        let now = Date()
-        for fileURL in files where fileURL.pathExtension == "json" {
-            guard let data = try? Data(contentsOf: fileURL),
-                  let session = try? decoder.decode(SessionState.self, from: data) else { continue }
-            guard session.status != .working else { continue }
-            let ref = session.diedAt ?? session.completedAt ?? session.lastUpdatedAt
-            if now.timeIntervalSince(ref) > gcAge {
-                try? FileManager.default.removeItem(at: fileURL)
             }
         }
     }

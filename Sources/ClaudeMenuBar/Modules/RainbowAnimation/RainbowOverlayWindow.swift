@@ -53,7 +53,7 @@ final class RainbowOverlayManager {
         }
 
         animationTimer?.invalidate()
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 20.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.tick()
             }
@@ -92,10 +92,10 @@ final class RainbowOverlayManager {
             return
 
         case .fadeIn:
-            fadeProgress += 1.0 / 9.0 // ~300ms at 30fps
+            fadeProgress += 1.0 / 6.0 // ~300ms at 20fps
             let alpha = min(1.0, CGFloat(fadeProgress))
             currentHeight = 2 + (targetHeight - 2) * min(1.0, fadeProgress * 2)
-            phase += 0.016
+            phase += 0.024
             if phase >= 1.0 { phase -= 1.0 }
 
             for window in windows { window.alphaValue = alpha }
@@ -106,11 +106,11 @@ final class RainbowOverlayManager {
             }
 
         case .flowing:
-            phase += 0.016
+            phase += 0.024
             if phase >= 1.0 { phase -= 1.0 }
             let breath = sin(fadeProgress * .pi * 2) * 0.5
             currentHeight = targetHeight + CGFloat(breath)
-            fadeProgress += 1.0 / 120.0
+            fadeProgress += 1.0 / 80.0
             if fadeProgress >= 1.0 { fadeProgress = 0 }
         }
 
