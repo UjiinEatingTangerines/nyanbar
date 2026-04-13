@@ -21,9 +21,6 @@ const path = require('path');
 const os = require('os');
 
 const SESSIONS_DIR = path.join(os.homedir(), '.claude', 'menubar-sessions');
-// Tool-use debounce: low enough to track rapid tool sequences in real time,
-// high enough to avoid filesystem write storms during tight loops.
-const DEBOUNCE_MS = 500;
 const MAX_MESSAGE_LENGTH = 120;
 
 function ensureDirExists(dirPath) {
@@ -198,12 +195,12 @@ function run(raw) {
       }
 
       case 'tool-use': {
-        // Debounce: skip if file was recently updated
-        if (existing) {
-          const lastUpdate = new Date(existing.lastUpdatedAt).getTime();
-          if (Date.now() - lastUpdate < DEBOUNCE_MS) return raw;
-        }
-
+        // No debounce here. Previously a 500ms guard skipped tool-use when the
+        // file was updated recently, but that could leave toolStartedAt unset
+        // for a slow tool that immediately followed a fast one (PostToolUse
+        // clears the field; the next PreToolUse must re-arm it). The Swift
+        // DispatchSource debounce (100ms) still coalesces rapid reloads, so
+        // per-event writes here are fine.
         const state = existing || {
           schemaVersion: 1,
           sessionId,

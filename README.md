@@ -155,6 +155,7 @@ nyanbar status      # Check installation status
 | File event latency | DispatchSource debounce tightened 300ms → 100ms (hook layer already debounces at 500ms) | UI reacts within ~100ms of the first file event |
 | Tool-in-flight detection | `toolStartedAt` field set by PreToolUse and cleared by PostToolUse/Stop; Swift gives in-flight tools up to 1 hour before staleness check | a 10-minute `pytest` run stays "working" instead of flickering to "pending" at 180s |
 | PostToolUse reliability | Removed debounce from `tool-end`; always clears `toolStartedAt`. Recovers status from `pending` → `working` if an over-eager stale sweep misfired | guarantees tool-end signal is honored exactly once per tool completion |
+| PreToolUse reliability | Removed debounce from `tool-use` too — Swift's 100ms DispatchSource debounce already caps reload rate, so hook-side debounce was only risking a dropped `toolStartedAt` when a slow tool followed a fast one | fast→slow tool sequences keep their stale-working grace |
 | Process exited | PID health check | dead |
 | cmux tab closed | Surface validity check | dead |
 | Session without hook | Process scan (`ps`) | auto-discovered + tracked |
