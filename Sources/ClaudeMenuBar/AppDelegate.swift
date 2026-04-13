@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var previousCompletedIds = Set<String>()
     private var acknowledgedPendingIds = Set<String>()
     private var timestampRefreshTimer: Timer?
+    private var sleepObserver: Any?
+    private var wakeObserver: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let myBundleId = Bundle.main.bundleIdentifier ?? "com.claudecode.menubar"
@@ -68,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.iconManager.update(state: .healthCheckDone)
         }
         healthCheck.start()
+        observeWakeSleep()
 
         timestampRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -93,6 +96,92 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         watcher.stopWatching()
         healthCheck.stop()
         timestampRefreshTimer?.invalidate()
+        let center = NSWorkspace.shared.notificationCenter
+        if let obs = sleepObserver { center.removeObserver(obs) }
+        if let obs = wakeObserver { center.removeObserver(obs) }
+    }
+
+    // MARK: - Sleep / Wake Recovery
+
+    /// Delay before restarting timers after wake.
+    /// WindowServer and NSStatusItem may not be fully ready immediately after wake.
+    nonisolated private static let wakeStabilizationDelay: TimeInterval = 1.5
+
+    private func observeWakeSleep() {
+        let center = NSWorkspace.shared.notificationCenter
+
+        sleepObserver = center.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleSleep()
+            }
+        }
+
+        wakeObserver = center.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // Immediately fix phantom popover and button (no delay)
+            Task { @MainActor in
+                self?.handleWakeImmediate()
+            }
+            // Delayed: restart timers and refresh state after system stabilizes
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.wakeStabilizationDelay) {
+                Task { @MainActor in
+                    self?.handleWakeDeferred()
+                }
+            }
+        }
+    }
+
+    private func handleSleep() {
+        // Close popover to prevent phantom isShown state on wake
+        if popover.isShown {
+            popover.performClose(nil)
+        }
+        // Dismiss rainbow overlay
+        if iconManager.isShowingRainbow {
+            iconManager.dismissRainbow()
+            RainbowOverlayManager.shared.hideRainbow()
+        }
+        // Acknowledge completed sessions to prevent false rainbow trigger on wake
+        let allCompleted = watcher.sessions.filter { $0.status == .completed }
+        previousCompletedIds = Set(allCompleted.map(\.sessionId))
+        // Stop timers (restarted on wake)
+        timestampRefreshTimer?.invalidate()
+        timestampRefreshTimer = nil
+    }
+
+    /// Called immediately on wake — fixes button responsiveness without delay.
+    private func handleWakeImmediate() {
+        // Force-close phantom popover (in case willSleep didn't fire or was too late)
+        if popover.isShown {
+            popover.performClose(nil)
+        }
+        // Re-validate status item button action/target
+        if let button = statusItem.button {
+            button.action = #selector(togglePopover(_:))
+            button.target = self
+        }
+    }
+
+    /// Called after stabilization delay — restarts timers and refreshes state.
+    private func handleWakeDeferred() {
+        // Restart timestamp refresh timer
+        timestampRefreshTimer?.invalidate()
+        timestampRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.watcher.refreshTimestamps()
+            }
+        }
+        // Restart health check timers
+        healthCheck.rescheduleAfterWake()
+        // Refresh icon state based on current sessions
+        updateIconWithoutRainbow()
     }
 
     // MARK: - Popover (anchored to icon)

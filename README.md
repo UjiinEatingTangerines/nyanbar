@@ -142,7 +142,7 @@ nyanbar status      # 설치 상태 확인
 | 프로세스 종료 | PID health check | dead |
 | cmux 탭 닫힘 | Surface 유효성 체크 | dead |
 | Hook 없는 세션 | 프로세스 스캔 (`ps`) | 자동 발견 + 추적 |
-| 맥북 잠자기 후 | Wake notification + DispatchSource 재생성 | 자동 복구 |
+| 맥북 잠자기 후 | Sleep/Wake notification + 팬텀 팝오버 해제 + 전체 타이머 재시작 + 버튼 재검증 | 자동 복구 |
 | UI 프리즈 방지 | 헬스체크 백그라운드 + 상태별 적응형 FPS (idle 3fps, working 5fps) | CPU ~4%, 메인 스레드 블로킹 없음 |
 
 ---

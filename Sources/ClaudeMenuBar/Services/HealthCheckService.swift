@@ -55,6 +55,17 @@ final class HealthCheckService: ObservableObject {
         scheduleTimer()
     }
 
+    /// Restart all timers after wake from sleep
+    func rescheduleAfterWake() {
+        guard isRunning else { return }
+        timer?.invalidate()
+        timer = nil
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        scheduleTimer()
+        startCountdown()
+    }
+
     // MARK: - Private
 
     private func scheduleTimer() {

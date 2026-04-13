@@ -44,7 +44,7 @@ final class SessionDirectoryWatcher: ObservableObject {
         }
         pollTimer?.invalidate()
         pollTimer = nil
-        if let obs = wakeObserver { NotificationCenter.default.removeObserver(obs) }
+        if let obs = wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(obs) }
     }
 
     /// Restart file monitoring (called after wake from sleep)
@@ -56,7 +56,11 @@ final class SessionDirectoryWatcher: ObservableObject {
             Darwin.close(directoryFD)
             directoryFD = -1
         }
-        // Recreate
+        // Restart poll timer (may have died during sleep)
+        pollTimer?.invalidate()
+        pollTimer = nil
+        startPollTimer()
+        // Recreate dispatch source
         setupDirectoryMonitor()
         reload()
     }
