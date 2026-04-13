@@ -1,79 +1,82 @@
 # 🐱 NyanBar (Claude Code)
 
-> macOS 메뉴바에서 Claude Code 세션을 모니터링하는 고양이빵 앱
+> A macOS menu bar app that watches your Claude Code sessions — with a tail-wagging cat loaf and rainbow notifications.
 
-[![npm](https://img.shields.io/npm/v/nyanbar)](https://www.npmjs.com/package/nyanbar) ![macOS](https://img.shields.io/badge/macOS-14.0+-blue) ![Swift](https://img.shields.io/badge/Swift-5.9+-orange) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![npm](https://img.shields.io/npm/v/nyanbar)](https://www.npmjs.com/package/nyanbar) [![GitHub stars](https://img.shields.io/github/stars/UjiinEatingTangerines/nyanbar?style=social)](https://github.com/UjiinEatingTangerines/nyanbar/stargazers) ![macOS](https://img.shields.io/badge/macOS-14.0+-blue) ![Swift](https://img.shields.io/badge/Swift-5.9+-orange) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ```bash
 npm install -g nyanbar && nyanbar install
 ```
 
+> ⭐ **If NyanBar helps you, please give it a star on [GitHub](https://github.com/UjiinEatingTangerines/nyanbar)!**
+> It motivates further development and helps other Claude Code users discover the project.
+
 ---
 
-## 왜 NyanBar?
+## Why NyanBar?
 
-Claude Code로 작업하다 보면 여러 세션을 동시에 돌릴 때가 많습니다.
-작업이 끝났는지 확인하려고 터미널을 계속 왔다 갔다 하는 건 비효율적이죠.
+When you work with Claude Code, you often run multiple sessions at once.
+Switching to each terminal just to check whether a task is done is tedious.
 
-NyanBar는 **메뉴바에 고양이빵이 앉아서** 모든 Claude Code 세션 상태를 실시간으로 알려줍니다.
-작업이 끝나면 **무지개 알림**으로 바로 알 수 있고, 클릭 한 번으로 해당 터미널로 이동할 수 있습니다.
+NyanBar puts a **cat loaf in your menu bar** that watches every Claude Code session in real time.
+When work finishes, a **rainbow flashes across the screen** so you know instantly — and one click jumps you to the right terminal.
 
 ---
 
 ## Features
 
-🍞 **메뉴바 고양이빵** — 식빵고양이가 꼬리를 흔들며 작업 상태를 알려줌
+🍞 **Menu Bar Cat Loaf** — a bread-shaped cat that wags its tail to show what's happening
 
-| 상태 | 고양이 | 메뉴바 텍스트 |
-|------|--------|-------------|
-| **Idle** | 꼬리 살랑살랑 + 가끔 하품 | `🍞 빵 굽는 중..` (밈 30종 랜덤) |
-| **Working** | 꼬리 활발히 S자 흔들림 | 프로젝트명 |
-| **Pending** | 아이콘 깜빡 | `🙋 입력 대기` |
-| **Completed** | 🌈 무지개 고양이 + 사운드 | `done!` |
-| **Sleep** | 💤 천천히 숨쉬는 고양이 | `💤 zzZ...` |
+| State | Cat | Menu Bar Text |
+|------|--------|--------------|
+| **Idle** | Gentle tail sway + occasional yawn | `🍞 Baking bread..` (30 random meme messages) |
+| **Working** | Active S-shaped tail wag | Project name |
+| **Pending** | Pulse blink | `🙋 Waiting for input` |
+| **Completed** | 🌈 Rainbow cat + sound | `done!` |
+| **Sleep** | 💤 Slowly breathing cat | `💤 zzZ...` |
 
-📋 **세션 대시보드** — 고양이 클릭하면 모든 세션을 한눈에
+📋 **Session Dashboard** — click the cat to see every session at a glance
 
-- Working / Waiting for Input / 그룹별 카드 UI
-- 프로젝트명, 경로, 경과시간, 터미널 앱, 마지막 메시지 표시
-- 세션 카드 클릭 → 해당 터미널로 바로 이동
+- Working / Waiting for Input groups, card-based UI
+- Project name, path, elapsed time, terminal app, last message
+- Click a card to jump to that terminal
 
-🌈 **무지개 알림** — 작업 완료를 놓치지 않음
+🌈 **Rainbow Notification** — never miss a completed task
 
-- 화면 상단에 무지개 그라디언트 바가 흐름
-- 모든 연결된 모니터에 동시 표시
-- 확인할 때까지 계속 표시 (아이콘 클릭으로 해제)
-- 10초 이상 작업 후 완료만 트리거 (짧은 응답은 무시)
+- A flowing rainbow gradient bar at the top of the screen
+- Mirrored across every connected display
+- Stays until you acknowledge it (one click on the icon dismisses)
+- Only fires for tasks longer than 10 seconds (short replies are ignored)
 
-📜 **히스토리** — 완료/유휴/충돌 세션 이력
+📜 **History** — see completed, idle, and crashed sessions
 
-- History 탭에서 과거 세션 확인
-- 24시간 후 자동 삭제 (파일 시스템 직접 스캔으로 확실한 정리)
-- Clear All 버튼으로 수동 정리
+- History tab for past sessions
+- Auto-deleted after 24 hours (filesystem scan ensures cleanup)
+- "Clear All" button for manual cleanup
 
-⚙️ **설정**
+⚙️ **Settings**
 
-- 🌐 **언어**: 한국어 / 日本語 / English (실시간 전환)
-- 🌓 **화면 모드**: System / Light / Dark
-- 🎨 **고양이 색상**: 12색 팔레트 + 초기화 (밝은 색은 검정 눈, 어두운 색은 흰 눈 자동 전환)
-- 🔊 **완료 사운드**: on/off
-- 🌙 **수면 모드**: 모든 알림 일시 중지
-- 💬 **커스텀 스피너**: 나만의 문구 추가 (on/off 토글 + 삭제)
-- ❤️ **헬스체크**: 10s / 20s / 30s / 5m / 30m / 1h
-- 🔄 **업데이트 체크**: npm 최신 버전 확인 + 원클릭 업데이트
+- 🌐 **Language**: Korean / Japanese / English (live switch)
+- 🌓 **Appearance**: System / Light / Dark
+- 🎨 **Cat Color**: 12-color palette + reset (auto-switches eye color for contrast)
+- 🔊 **Completion Sound**: on/off
+- 🌙 **Sleep Mode**: pause every notification
+- 💬 **Custom Spinner Text**: add your own messages (toggle + delete)
+- ❤️ **Health Check Interval**: 10s / 20s / 30s / 5m / 30m / 1h
+- 🔄 **Update Check**: query npm for latest version + one-click update
 
 ---
 
 ## Installation
 
-### npm (권장)
+### npm (recommended)
 
 ```bash
 npm install -g nyanbar
 nyanbar install
 ```
 
-### npx (설치 없이)
+### npx (no install)
 
 ```bash
 npx nyanbar install
@@ -89,38 +92,38 @@ node bin/nyanbar.js install
 
 > **Requirements**: macOS 14.0+, Node.js 18+, [Claude Code CLI](https://claude.ai/code), Xcode Command Line Tools (`xcode-select --install`)
 
-### `nyanbar install` 이 하는 것
+### What `nyanbar install` does
 
-1. Swift로 앱 빌드 (`swift build -c release`)
-2. `~/Applications/ClaudeMenuBar.app` 번들 생성 + 코드 서명
-3. Hook 스크립트를 `~/.claude/scripts/hooks/`에 복사
-4. `~/.claude/settings.json`에 5개 Hook 자동 등록 (SessionStart, PreToolUse, Stop, Notification, SessionEnd)
-5. LaunchAgent 설치 (로그인 시 자동 시작)
-6. 앱 실행
+1. Builds the app with Swift (`swift build -c release`)
+2. Creates a code-signed bundle at `~/Applications/ClaudeMenuBar.app`
+3. Copies the hook script to `~/.claude/scripts/hooks/`
+4. Registers 5 hooks in `~/.claude/settings.json` (SessionStart, PreToolUse, Stop, Notification, SessionEnd)
+5. Installs a LaunchAgent (auto-start on login)
+6. Launches the app
 
 ---
 
 ## Commands
 
 ```bash
-nyanbar install     # 빌드 + 설치 + Hook 등록 + 자동시작
-nyanbar uninstall   # 완전 제거
-nyanbar start       # 앱 시작
-nyanbar stop        # 앱 종료
-nyanbar status      # 설치 상태 확인
+nyanbar install     # Build, install, register hooks, enable auto-start
+nyanbar uninstall   # Remove everything
+nyanbar start       # Start the app
+nyanbar stop        # Stop the app
+nyanbar status      # Check installation status
 ```
 
 ---
 
 ## Usage
 
-1. 메뉴바에 고양이빵 아이콘이 나타남
-2. Claude Code 세션을 시작하면 자동 감지
-3. 고양이 클릭 → 세션 대시보드 (Sessions / History / Settings 탭)
-4. 세션 카드 클릭 → 해당 터미널로 이동
-5. 작업 완료 → 무지개 + 사운드 → 고양이 클릭으로 확인
+1. The cat loaf appears in your menu bar
+2. Start any Claude Code session — NyanBar detects it automatically
+3. Click the cat → opens the dashboard (Sessions / History / Settings tabs)
+4. Click a session card → jumps to that terminal
+5. Task completed → rainbow + sound → click the cat to acknowledge
 
-### 스피너 문구 (30종 × 3개 언어)
+### Spinner Messages (30 each in 3 languages)
 
 > 🍞 빵 굽는 중.. · 🐾 꾹꾹이 하는 중.. · 😴 골골골.. · 😾 야옹 안 할거다냥 · 🏃 3초후 미친듯이 뜀 · 😸 집사 교육 95% · ...
 
@@ -132,28 +135,28 @@ nyanbar status      # 설치 상태 확인
 
 ## Smart Detection
 
-| 상황 | 감지 방법 | 결과 |
-|------|----------|------|
-| 10초+ 작업 후 완료 | Stop hook + duration check + 10s 시간 기반 감지 | ✅ 무지개 + 사운드 |
-| 짧은 응답/에러 | Stop hook + duration < 10s | idle (무지개 X) |
-| AskUserQuestion | Stop hook + tool name check | pending (🙋 입력 대기) |
-| 질문 패턴 | 메시지 패턴 매칭 | pending |
-| 권한 프롬프트 | 30초 stale-working 감지 | pending |
-| 프로세스 종료 | PID health check | dead |
-| cmux 탭 닫힘 | Surface 유효성 체크 | dead |
-| Hook 없는 세션 | 프로세스 스캔 (`ps`) | 자동 발견 + 추적 |
-| 맥북 잠자기 후 | Sleep/Wake notification + 팬텀 팝오버 해제 + 전체 타이머 재시작 + 버튼 재검증 | 자동 복구 |
-| UI 프리즈 방지 | 헬스체크 백그라운드 + 상태별 적응형 FPS (idle 3fps, working 5fps) | CPU ~4%, 메인 스레드 블로킹 없음 |
-| 빠른 파일 변경 | DispatchSource 이벤트 0.3s debounce | reload 폭풍 방지 |
-| 리소스 효율 | 헬스체크 단일 패스 I/O + rainbow 20fps 최적화 | 메모리/CPU 절감 |
+| Situation | How it's detected | Result |
+|-----------|-------------------|--------|
+| Task longer than 10s completes | Stop hook + duration check + 10s time-based fallback | ✅ Rainbow + sound |
+| Short reply / error | Stop hook + duration < 10s | idle (no rainbow) |
+| AskUserQuestion | Stop hook + tool name check | pending (🙋 waiting for input) |
+| Question pattern | Message pattern match | pending |
+| Permission prompt | 30s stale-working detection | pending |
+| Process exited | PID health check | dead |
+| cmux tab closed | Surface validity check | dead |
+| Session without hook | Process scan (`ps`) | auto-discovered + tracked |
+| MacBook woken from sleep | Sleep/Wake notifications + phantom popover reset + full timer restart + button re-validation | auto-recovered |
+| UI freeze prevention | Background health check + adaptive FPS (idle 3fps, working 5fps) | CPU ~4%, no main-thread blocking |
+| Rapid file changes | DispatchSource events with 0.3s debounce | no reload storms |
+| Resource efficiency | Single-pass health-check I/O + 20fps rainbow | reduced CPU & memory |
 
 ---
 
 ## Supported Terminals
 
-| Terminal | 세션 감지 | 클릭 이동 |
+| Terminal | Session Detection | Click to Focus |
 |----------|:-:|:-:|
-| cmux | ✅ | ✅ (패널 단위) |
+| cmux | ✅ | ✅ (per panel) |
 | Ghostty | ✅ | ✅ |
 | iTerm2 | ✅ | ✅ |
 | Terminal.app | ✅ | ✅ |
@@ -226,8 +229,22 @@ nyanbar/
 nyanbar uninstall
 ```
 
-앱, Hook, LaunchAgent, 세션 데이터, settings.json의 Hook 항목까지 깨끗하게 제거됩니다.
+Removes the app, hook script, LaunchAgent, session data, and the hook entries in `settings.json` — clean and complete.
+
+---
+
+## Support the Project
+
+If NyanBar makes your Claude Code workflow a little nicer:
+
+- ⭐ **[Star the repo on GitHub](https://github.com/UjiinEatingTangerines/nyanbar)** — it really helps the project grow
+- 🐛 **[Report bugs or suggest features](https://github.com/UjiinEatingTangerines/nyanbar/issues)**
+- 🐱 Share it with other Claude Code users
+
+Every star tells me people care about the project — thank you! 냥~
+
+---
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — Made with 🐾 in Korea.
