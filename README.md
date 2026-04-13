@@ -153,6 +153,8 @@ nyanbar status      # Check installation status
 | Session reload I/O | File read + JSON decode + sort moved off the main thread | popover stays responsive even with many session files |
 | Redundant icon updates | `iconManager.update(state:)` short-circuits when the effective state is unchanged | no animation-timer thrash on busy `$sessions` publishes |
 | File event latency | DispatchSource debounce tightened 300ms → 100ms (hook layer already debounces at 500ms) | UI reacts within ~100ms of the first file event |
+| Tool-in-flight detection | `toolStartedAt` field set by PreToolUse and cleared by PostToolUse/Stop; Swift gives in-flight tools up to 1 hour before staleness check | a 10-minute `pytest` run stays "working" instead of flickering to "pending" at 180s |
+| PostToolUse reliability | Removed debounce from `tool-end`; always clears `toolStartedAt`. Recovers status from `pending` → `working` if an over-eager stale sweep misfired | guarantees tool-end signal is honored exactly once per tool completion |
 | Process exited | PID health check | dead |
 | cmux tab closed | Surface validity check | dead |
 | Session without hook | Process scan (`ps`) | auto-discovered + tracked |

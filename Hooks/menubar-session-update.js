@@ -234,6 +234,10 @@ function run(raw) {
         state.status = 'working';
         state.lastUpdatedAt = now;
         state.lastToolName = input.tool_name || null;
+        // Mark this tool as "in flight" so Swift's stale-working checker
+        // gives long-running tools (builds, test suites, slow fetches) up
+        // to an hour of grace before flagging the session as pending.
+        state.toolStartedAt = now;
         if (!state.pid) state.pid = claudePid;
         if (!state.terminalApp && terminalApp) state.terminalApp = terminalApp;
         if (!state.cmuxPanelId && cmuxPanelId) state.cmuxPanelId = cmuxPanelId;
@@ -262,6 +266,7 @@ function run(raw) {
 
         state.lastUpdatedAt = now;
         state.lastMessage = truncateMessage(input.last_assistant_message) || state.lastMessage;
+        state.toolStartedAt = null;  // assistant turn ended — no tool in flight
         if (!state.pid) state.pid = claudePid;
         if (!state.terminalApp && terminalApp) state.terminalApp = terminalApp;
         if (!state.cmuxPanelId && cmuxPanelId) state.cmuxPanelId = cmuxPanelId;
@@ -350,14 +355,18 @@ function run(raw) {
       }
 
       case 'tool-end': {
-        // Tool just finished. Keep the session in 'working' state and refresh
-        // lastUpdatedAt so the 30s stale-working → pending sweep doesn't misfire
-        // during long sequences of tool calls. Same DEBOUNCE_MS as tool-use
-        // prevents write storms in tight loops.
+        // Tool just finished. Always write (no debounce) so toolStartedAt is
+        // reliably cleared — otherwise a stale value could trick the Swift
+        // stale checker into keeping a dead tool "in flight". PostToolUse
+        // fires once per tool completion, naturally bounded by tool rate.
         if (existing) {
-          const lastUpdate = new Date(existing.lastUpdatedAt).getTime();
-          if (Date.now() - lastUpdate < DEBOUNCE_MS) return raw;
           existing.lastUpdatedAt = now;
+          existing.toolStartedAt = null;  // tool is no longer in flight
+          // If an over-eager stale sweep flipped us to 'pending' mid-tool,
+          // restore the correct state now that the tool actually finished.
+          if (existing.status === 'pending') {
+            existing.status = 'working';
+          }
           if (!existing.pid) existing.pid = claudePid;
           if (!existing.terminalApp && terminalApp) existing.terminalApp = terminalApp;
           if (!existing.cmuxPanelId && cmuxPanelId) existing.cmuxPanelId = cmuxPanelId;
@@ -391,6 +400,7 @@ function run(raw) {
         state.lastUpdatedAt = now;
         state.completedAt = null;
         state.diedAt = null;
+        state.toolStartedAt = null;  // new turn — prior tool state (if any) is gone
         if (!state.pid) state.pid = claudePid;
         if (!state.terminalApp && terminalApp) state.terminalApp = terminalApp;
         if (!state.cmuxPanelId && cmuxPanelId) state.cmuxPanelId = cmuxPanelId;

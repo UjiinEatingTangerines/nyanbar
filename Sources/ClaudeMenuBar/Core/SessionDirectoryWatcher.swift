@@ -202,11 +202,22 @@ final class SessionDirectoryWatcher: ObservableObject {
         return explicitPending + stalePending
     }
 
-    /// A "working" session that hasn't been updated recently is likely waiting for user input
+    /// A "working" session that hasn't been updated recently is likely waiting for user input.
+    /// In-flight tool grace: if a tool started recently (PreToolUse set toolStartedAt, no
+    /// PostToolUse cleared it yet), give long-running tools up to an hour before flagging as
+    /// stale. The PID liveness check in HealthCheckService handles genuinely dead sessions.
     private func isStaleWorking(_ session: SessionState) -> Bool {
         guard session.status == .working else { return false }
+        if let toolStart = session.toolStartedAt {
+            let toolElapsed = Date().timeIntervalSince(toolStart)
+            if toolElapsed < Self.toolInFlightGrace { return false }
+        }
         return Date().timeIntervalSince(session.lastUpdatedAt) > Self.pendingThreshold
     }
+
+    /// Maximum in-flight tool duration before we still flag as stale. 1 hour covers
+    /// even very long builds or test suites. Beyond that something's stuck.
+    private static let toolInFlightGrace: TimeInterval = 3600
 
     var completedSessions: [SessionState] {
         sessions.filter { $0.status == .completed }

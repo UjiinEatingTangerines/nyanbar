@@ -22,6 +22,13 @@ struct SessionState: Codable, Identifiable, Equatable {
     var diedAt: Date?
     var pid: Int?
 
+    /// When the *currently running* tool started. Set by PreToolUse,
+    /// cleared by PostToolUse / Stop / UserPromptSubmit. Lets the stale
+    /// checker distinguish "long-running tool" (not stale) from "idle
+    /// working session" (stale) — a Bash that streams for 5 minutes
+    /// should stay "working", not flicker to "pending" at the 180s mark.
+    var toolStartedAt: Date?
+
     // Terminal info
     var terminalApp: String?
     var cmuxPanelId: String?
