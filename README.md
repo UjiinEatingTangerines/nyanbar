@@ -97,7 +97,7 @@ node bin/nyanbar.js install
 1. Builds the app with Swift (`swift build -c release`)
 2. Creates a code-signed bundle at `~/Applications/ClaudeMenuBar.app`
 3. Copies the hook script to `~/.claude/scripts/hooks/`
-4. Registers 5 hooks in `~/.claude/settings.json` (SessionStart, UserPromptSubmit, PreToolUse, Stop, SessionEnd)
+4. Registers 6 hooks in `~/.claude/settings.json` (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop, SessionEnd)
 5. Installs a LaunchAgent (auto-start on login)
 6. Launches the app
 
@@ -146,6 +146,9 @@ nyanbar status      # Check installation status
 | Real-time tool tracking | Hook tool-use debounce reduced to 500ms + UserPromptSubmit hook fires on new user message | dashboard reflects live tool/turn within ~0.5s |
 | Faster session discovery | Process scan runs every 2nd health check (was every 5th) | hookless sessions appear in seconds |
 | Animation overhead | NSImage frame cache (NSBitmapImageRep) + skip identical button updates | ~80% fewer image allocations per second |
+| Long-running tool heartbeat | PostToolUse hook refreshes `lastUpdatedAt` every tool completion | no false stale-working during long Bash/Edit chains |
+| Countdown tick waste | Countdown timer pauses while popover is closed | saves 86,400 ticks/day of SwiftUI re-evaluation |
+| Background timer wakes | `Timer.tolerance` on non-critical timers (poll 2s / refresh 5s / health 10%) | macOS coalesces wakes → better battery life |
 | Process exited | PID health check | dead |
 | cmux tab closed | Surface validity check | dead |
 | Session without hook | Process scan (`ps`) | auto-discovered + tracked |

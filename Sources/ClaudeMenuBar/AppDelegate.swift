@@ -3,7 +3,7 @@ import SwiftUI
 import Combine
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var iconManager: MenuBarIconManager!
@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentSize = NSSize(width: 370, height: 500)
         popover.behavior = .transient
         popover.animates = true
+        popover.delegate = self  // for popover show/close → pause countdown tick
 
         healthCheck = HealthCheckService(watcher: watcher, settings: settings)
 
@@ -70,13 +71,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.iconManager.update(state: .healthCheckDone)
         }
         healthCheck.start()
+        healthCheck.pauseCountdown()  // popover starts closed — no need to tick
         observeWakeSleep()
 
-        timestampRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.watcher.refreshTimestamps()
-            }
-        }
+        timestampRefreshTimer = Self.scheduleTimestampRefresh(watcher: watcher)
 
         // Snapshot current completed sessions to avoid false triggers on startup
         previousCompletedIds = Set(
@@ -106,6 +104,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Delay before restarting timers after wake.
     /// WindowServer and NSStatusItem may not be fully ready immediately after wake.
     nonisolated private static let wakeStabilizationDelay: TimeInterval = 1.5
+
+    /// Build the timestamp-refresh timer. The timer only nudges time labels in
+    /// the popover UI, so a 5s tolerance lets macOS coalesce it with other wakes.
+    private static func scheduleTimestampRefresh(watcher: SessionDirectoryWatcher) -> Timer {
+        let t = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak watcher] _ in
+            Task { @MainActor in
+                watcher?.refreshTimestamps()
+            }
+        }
+        t.tolerance = 5.0
+        return t
+    }
 
     private func observeWakeSleep() {
         let center = NSWorkspace.shared.notificationCenter
@@ -173,11 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func handleWakeDeferred() {
         // Restart timestamp refresh timer
         timestampRefreshTimer?.invalidate()
-        timestampRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.watcher.refreshTimestamps()
-            }
-        }
+        timestampRefreshTimer = Self.scheduleTimestampRefresh(watcher: watcher)
         // Restart health check timers
         healthCheck.rescheduleAfterWake()
         // Refresh icon state based on current sessions
@@ -281,6 +287,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         updateIconWithoutRainbow()
     }
+
+    // MARK: - NSPopoverDelegate
+
+    nonisolated func popoverDidShow(_ notification: Notification) {
+        Task { @MainActor in
+            self.healthCheck.resumeCountdown()
+        }
+    }
+
+    nonisolated func popoverDidClose(_ notification: Notification) {
+        Task { @MainActor in
+            self.healthCheck.pauseCountdown()
+        }
+    }
+
+    // MARK: - Icon helpers (continued)
 
     private func updateIconWithoutRainbow() {
         // Priority: working > unacknowledged pending > idle

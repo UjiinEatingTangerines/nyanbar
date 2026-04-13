@@ -68,6 +68,20 @@ final class HealthCheckService: ObservableObject {
         startCountdown()
     }
 
+    /// Pause the per-second countdown tick when the popover is hidden —
+    /// nobody is watching the countdown, so publishing `objectWillChange`
+    /// 86,400 times a day is pure waste.
+    func pauseCountdown() {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+    }
+
+    /// Resume the countdown tick when the popover becomes visible again.
+    func resumeCountdown() {
+        guard isRunning, countdownTimer == nil else { return }
+        startCountdown()
+    }
+
     // MARK: - Private
 
     private func scheduleTimer() {
@@ -75,7 +89,7 @@ final class HealthCheckService: ObservableObject {
         let interval = settings.healthCheckSeconds
         nextCheckAt = Date().addingTimeInterval(interval)
 
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        let t = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             // Run health check on background thread to avoid blocking UI
             DispatchQueue.global(qos: .utility).async {
                 self?.performHealthCheckBackground()
@@ -86,6 +100,11 @@ final class HealthCheckService: ObservableObject {
                 }
             }
         }
+        // Allow macOS to coalesce with other timers — health check is not time-critical.
+        // 10% tolerance (up to 3 minutes on a 30-min interval) lets the scheduler wake
+        // the CPU less often, saving battery.
+        t.tolerance = max(1.0, interval * 0.1)
+        timer = t
     }
 
     private func startCountdown() {

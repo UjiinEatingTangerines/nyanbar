@@ -128,6 +128,7 @@ function getEventType(input) {
     if (arg.includes('menubar:notification')) return 'notification';
     if (arg.includes('menubar:session-end')) return 'session-end';
     if (arg.includes('menubar:prompt-submit')) return 'prompt-submit';
+    if (arg.includes('menubar:tool-end')) return 'tool-end';
   }
 
   // Infer from stdin content
@@ -345,6 +346,25 @@ function run(raw) {
             fs.unlinkSync(filePath);
           }
         } catch { /* ignore */ }
+        break;
+      }
+
+      case 'tool-end': {
+        // Tool just finished. Keep the session in 'working' state and refresh
+        // lastUpdatedAt so the 30s stale-working → pending sweep doesn't misfire
+        // during long sequences of tool calls. Same DEBOUNCE_MS as tool-use
+        // prevents write storms in tight loops.
+        if (existing) {
+          const lastUpdate = new Date(existing.lastUpdatedAt).getTime();
+          if (Date.now() - lastUpdate < DEBOUNCE_MS) return raw;
+          existing.lastUpdatedAt = now;
+          if (!existing.pid) existing.pid = claudePid;
+          if (!existing.terminalApp && terminalApp) existing.terminalApp = terminalApp;
+          if (!existing.cmuxPanelId && cmuxPanelId) existing.cmuxPanelId = cmuxPanelId;
+          writeStateAtomic(filePath, existing);
+        }
+        // No existing state: ignore — a stray PostToolUse without prior
+        // session-start isn't a reliable signal to create a session file.
         break;
       }
 

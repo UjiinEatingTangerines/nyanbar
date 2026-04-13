@@ -244,11 +244,15 @@ final class SessionDirectoryWatcher: ObservableObject {
 
     private func startPollTimer() {
         // Poll every 10s — DispatchSource handles most changes instantly
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+        let t = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.reload()
             }
         }
+        // DispatchSource is the fast path; this poll is a safety net, so let
+        // macOS coalesce it with other system timers (up to 2s off).
+        t.tolerance = 2.0
+        pollTimer = t
     }
 
     private func observeWakeSleep() {
