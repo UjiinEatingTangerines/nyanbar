@@ -143,6 +143,9 @@ nyanbar status      # Check installation status
 | Question pattern | Message pattern match | pending |
 | Permission prompt | 30s stale-working detection | pending |
 | Idle reminder after Stop | Notification only flips `working`/`pending` → `pending` (never overrides `completed`/`idle`) | no phantom pending |
+| Real-time tool tracking | Hook tool-use debounce reduced to 500ms + UserPromptSubmit hook fires on new user message | dashboard reflects live tool/turn within ~0.5s |
+| Faster session discovery | Process scan runs every 2nd health check (was every 5th) | hookless sessions appear in seconds |
+| Animation overhead | NSImage frame cache (NSBitmapImageRep) + skip identical button updates | ~80% fewer image allocations per second |
 | Process exited | PID health check | dead |
 | cmux tab closed | Surface validity check | dead |
 | Session without hook | Process scan (`ps`) | auto-discovered + tracked |

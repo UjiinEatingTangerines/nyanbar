@@ -51,6 +51,15 @@ const HOOK_ENTRIES = {
       timeout: 5,
       async: true
     }]
+  },
+  UserPromptSubmit: {
+    matcher: '*',
+    hooks: [{
+      type: 'command',
+      command: `_MENUBAR_EVENT=prompt-submit node "$CLAUDE_PLUGIN_ROOT/scripts/hooks/menubar-session-update.js"`,
+      timeout: 5,
+      async: true
+    }]
   }
 };
 

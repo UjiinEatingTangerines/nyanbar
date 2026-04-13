@@ -37,7 +37,95 @@ final class MenuBarIconManager {
         return NSColor(hex: hex)
     }
 
-    private static let iconRainbowGradient: CGGradient? = {
+    // MARK: - Frame Cache
+    //
+    // The icon redraws at 3–5 fps for hours at a time. Re-rendering ~10
+    // NSBezierPath fills + strokes on every tick is the dominant CPU cost.
+    // We quantize (color, swing, yawn) and memoize a baked NSBitmapImageRep
+    // so subsequent ticks just hand the menu bar an already-rasterized image.
+    //
+    // We also remember the last image key per instance so we skip updating
+    // the status item when the bucket hasn't changed (huge win at low fps).
+    nonisolated private static let imageCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 600       // ~per-color × swing × yawn buckets
+        cache.totalCostLimit = 8 * 1024 * 1024  // 8 MB hard cap
+        return cache
+    }()
+    private var lastImageKey: NSString?
+
+    nonisolated private static func cacheKey(color: NSColor?, swing: CGFloat, yawn: CGFloat) -> NSString {
+        let colorPart: String
+        if let c = color, let rgb = c.usingColorSpace(.sRGB) {
+            let r = Int((rgb.redComponent * 255).rounded())
+            let g = Int((rgb.greenComponent * 255).rounded())
+            let b = Int((rgb.blueComponent * 255).rounded())
+            colorPart = "\(r),\(g),\(b)"
+        } else {
+            colorPart = "sys"
+        }
+        // Quantize swing into 0.05 buckets (range roughly [-1, 1] → 41 values).
+        let swingBucket = Int((swing * 20).rounded())
+        // Yawn is 0 most of the time; quantize to 10 buckets when active.
+        let yawnBucket = yawn > 0 ? Int((yawn * 10).rounded()) : 0
+        return "\(colorPart)|\(swingBucket)|\(yawnBucket)" as NSString
+    }
+
+    /// Returns a cached, pre-rasterized cat image for the given parameters.
+    /// Falls back to on-the-fly rendering when bitmap allocation fails.
+    nonisolated private static func cachedCatLoaf(tailSwing: CGFloat, yawn: CGFloat, customColor: NSColor?) -> NSImage {
+        let key = cacheKey(color: customColor, swing: tailSwing, yawn: yawn)
+        if let cached = imageCache.object(forKey: key) {
+            return cached
+        }
+        let img = renderCatLoafBitmap(tailSwing: tailSwing, yawn: yawn, customColor: customColor)
+        // Approximate cost: width × height × 4 bytes × 2× backing scale (≈6 KB).
+        let cost = Int(catSize.width * catSize.height * 4 * 4)
+        imageCache.setObject(img, forKey: key, cost: cost)
+        return img
+    }
+
+    /// Render the cat into an NSBitmapImageRep so the cached NSImage owns a
+    /// real bitmap (instead of a deferred drawing handler that re-runs each
+    /// time the image is drawn).
+    nonisolated private static func renderCatLoafBitmap(tailSwing: CGFloat, yawn: CGFloat, customColor: NSColor?) -> NSImage {
+        let scale: CGFloat = 2.0  // retina baseline
+        let pixelW = Int((catSize.width * scale).rounded())
+        let pixelH = Int((catSize.height * scale).rounded())
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: pixelW,
+            pixelsHigh: pixelH,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: pixelW * 4,
+            bitsPerPixel: 32
+        ) else {
+            return createCatLoaf(tailSwing: tailSwing, yawn: yawn, customColor: customColor)
+        }
+        rep.size = catSize  // logical points
+
+        let drawColor = customColor ?? .black
+        NSGraphicsContext.saveGraphicsState()
+        if let ctx = NSGraphicsContext(bitmapImageRep: rep) {
+            NSGraphicsContext.current = ctx
+            drawCatLoafSilhouette(
+                in: NSRect(origin: .zero, size: catSize),
+                tailSwing: tailSwing, yawn: yawn, color: drawColor
+            )
+        }
+        NSGraphicsContext.restoreGraphicsState()
+
+        let img = NSImage(size: catSize)
+        img.addRepresentation(rep)
+        img.isTemplate = (customColor == nil)
+        return img
+    }
+
+    nonisolated private static let iconRainbowGradient: CGGradient? = {
         let spectrum: [CGColor] = [
             NSColor(red: 1.0, green: 0.25, blue: 0.35, alpha: 1).cgColor,
             NSColor(red: 1.0, green: 0.55, blue: 0.15, alpha: 1).cgColor,
@@ -79,6 +167,7 @@ final class MenuBarIconManager {
     func update(state: IconState) {
         stopAnimation()
         statusItem.button?.alphaValue = 1.0  // Reset from pending pulse
+        lastImageKey = nil  // force first frame after a state change
         currentState = state
 
         switch state {
@@ -166,16 +255,16 @@ final class MenuBarIconManager {
     //               ~~    ← tail from back
 
     // Fixed size — extra width to accommodate tail animation without jitter
-    private static let catSize = NSSize(width: 22, height: 18)
+    nonisolated private static let catSize = NSSize(width: 22, height: 18)
 
     /// Determine if a color is "light" (needs dark eyes)
-    private static func isLightColor(_ color: NSColor) -> Bool {
+    nonisolated private static func isLightColor(_ color: NSColor) -> Bool {
         guard let rgb = color.usingColorSpace(.sRGB) else { return false }
         let luminance = 0.299 * rgb.redComponent + 0.587 * rgb.greenComponent + 0.114 * rgb.blueComponent
         return luminance > 0.6
     }
 
-    private static func drawCatLoafSilhouette(
+    nonisolated private static func drawCatLoafSilhouette(
         in rect: NSRect,
         tailSwing: CGFloat,
         yawn: CGFloat,
@@ -293,7 +382,7 @@ final class MenuBarIconManager {
         }
     }
 
-    private static func drawYawnBurst(
+    nonisolated private static func drawYawnBurst(
         in rect: NSRect, cx: CGFloat, cy: CGFloat,
         progress: CGFloat, color: NSColor
     ) {
@@ -326,7 +415,7 @@ final class MenuBarIconManager {
         }
     }
 
-    private static func drawWhiteEyes(in rect: NSRect) {
+    nonisolated private static func drawWhiteEyes(in rect: NSRect) {
         let w = rect.width, h = rect.height
         let ground = h * 0.05
         let bw = w * 0.62
@@ -344,7 +433,7 @@ final class MenuBarIconManager {
 
     // MARK: - Image Creation
 
-    private static func createCatLoaf(tailSwing: CGFloat = 0, yawn: CGFloat = 0, customColor: NSColor? = nil) -> NSImage {
+    nonisolated private static func createCatLoaf(tailSwing: CGFloat = 0, yawn: CGFloat = 0, customColor: NSColor? = nil) -> NSImage {
         let drawColor = customColor ?? .black
         let img = NSImage(size: catSize, flipped: false) { rect in
             drawCatLoafSilhouette(in: rect, tailSwing: tailSwing, yawn: yawn, color: drawColor)
@@ -354,7 +443,7 @@ final class MenuBarIconManager {
         return img
     }
 
-    private static func createRainbowCatLoaf(
+    nonisolated private static func createRainbowCatLoaf(
         phase: CGFloat, tailSwing: CGFloat, yawn: CGFloat = 0
     ) -> NSImage {
         let img = NSImage(size: catSize, flipped: false) { rect in
@@ -394,6 +483,7 @@ final class MenuBarIconManager {
     private func startIdleAnimation() {
         phase = 0
         spinnerTickCount = 0
+        lastImageKey = nil
         setFixedTitle(currentSpinnerMessage)
         // Idle: 0.3s interval (~3fps) — very low CPU, tail barely moves
         animationTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
@@ -405,9 +495,7 @@ final class MenuBarIconManager {
                 self.tickSpinner()
 
                 let swing = sin(self.phase) * 0.4 + sin(self.phase * 1.8) * 0.2
-                self.statusItem.button?.image = Self.createCatLoaf(
-                    tailSwing: swing, yawn: self.yawnProgress, customColor: self.catColor
-                )
+                self.applyCatImage(swing: swing, yawn: self.yawnProgress)
             }
         }
     }
@@ -433,6 +521,7 @@ final class MenuBarIconManager {
     /// Working: active tail sway + periodic yawn
     private func startWorkingAnimation() {
         phase = 0
+        lastImageKey = nil
         animationTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
@@ -441,9 +530,7 @@ final class MenuBarIconManager {
                 self.tickYawn()
 
                 let swing = sin(self.phase) * 0.7 + sin(self.phase * 2.3) * 0.3
-                self.statusItem.button?.image = Self.createCatLoaf(
-                    tailSwing: swing, yawn: self.yawnProgress, customColor: self.catColor
-                )
+                self.applyCatImage(swing: swing, yawn: self.yawnProgress)
             }
         }
     }
@@ -451,6 +538,7 @@ final class MenuBarIconManager {
     /// Pending: slow pulse (opacity blink) + gentle tail — keeps template mode
     private func startPendingAnimation() {
         phase = 0
+        lastImageKey = nil
         animationTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
@@ -460,8 +548,7 @@ final class MenuBarIconManager {
                 let swing = sin(self.phase * 0.8) * 0.3
                 let pulse = 0.75 + 0.25 * sin(self.phase * 1.5)
 
-                let img = Self.createCatLoaf(tailSwing: swing, customColor: self.catColor)
-                self.statusItem.button?.image = img
+                self.applyCatImage(swing: swing, yawn: 0)
                 self.statusItem.button?.alphaValue = CGFloat(pulse)
             }
         }
@@ -516,7 +603,7 @@ final class MenuBarIconManager {
     }
 
     /// Yellow → Green gradient cat for health check flash
-    private static func createHealthCheckCatLoaf(progress: CGFloat, tailSwing: CGFloat) -> NSImage {
+    nonisolated private static func createHealthCheckCatLoaf(progress: CGFloat, tailSwing: CGFloat) -> NSImage {
         let img = NSImage(size: catSize, flipped: false) { rect in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
 
@@ -561,7 +648,7 @@ final class MenuBarIconManager {
         return img
     }
 
-    private static func blend(_ c1: NSColor, _ c2: NSColor, amount: CGFloat) -> NSColor {
+    nonisolated private static func blend(_ c1: NSColor, _ c2: NSColor, amount: CGFloat) -> NSColor {
         let a = min(1.0, max(0.0, amount))
         let r1 = c1.redComponent, g1 = c1.greenComponent, b1 = c1.blueComponent
         let r2 = c2.redComponent, g2 = c2.greenComponent, b2 = c2.blueComponent
@@ -632,5 +719,18 @@ final class MenuBarIconManager {
     private func stopAnimation() {
         animationTimer?.invalidate()
         animationTimer = nil
+    }
+
+    /// Quantize the requested cat image and skip the menu-bar update entirely
+    /// when this frame falls in the same bucket as the previous one.
+    /// This is the central CPU optimization — at 3 fps the cat often stays
+    /// in the same swing bucket for several ticks in a row.
+    private func applyCatImage(swing: CGFloat, yawn: CGFloat) {
+        let key = Self.cacheKey(color: catColor, swing: swing, yawn: yawn)
+        if key == lastImageKey { return }
+        statusItem.button?.image = Self.cachedCatLoaf(
+            tailSwing: swing, yawn: yawn, customColor: catColor
+        )
+        lastImageKey = key
     }
 }

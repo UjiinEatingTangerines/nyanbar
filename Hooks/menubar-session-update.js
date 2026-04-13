@@ -21,7 +21,9 @@ const path = require('path');
 const os = require('os');
 
 const SESSIONS_DIR = path.join(os.homedir(), '.claude', 'menubar-sessions');
-const DEBOUNCE_MS = 3000;
+// Tool-use debounce: low enough to track rapid tool sequences in real time,
+// high enough to avoid filesystem write storms during tight loops.
+const DEBOUNCE_MS = 500;
 const MAX_MESSAGE_LENGTH = 120;
 
 function ensureDirExists(dirPath) {
@@ -125,6 +127,7 @@ function getEventType(input) {
     if (arg.includes('menubar:stop')) return 'stop';
     if (arg.includes('menubar:notification')) return 'notification';
     if (arg.includes('menubar:session-end')) return 'session-end';
+    if (arg.includes('menubar:prompt-submit')) return 'prompt-submit';
   }
 
   // Infer from stdin content
@@ -342,6 +345,38 @@ function run(raw) {
             fs.unlinkSync(filePath);
           }
         } catch { /* ignore */ }
+        break;
+      }
+
+      case 'prompt-submit': {
+        // User just sent a new message — Claude is starting a new working cycle.
+        // Reset completion state so the menubar reflects "actively working" right away.
+        const state = existing || {
+          schemaVersion: 1,
+          sessionId,
+          projectName: getProjectName(),
+          workingDirectory: process.cwd(),
+          startedAt: now,
+          lastMessage: null,
+          lastToolName: null,
+          diedAt: null,
+          pid: claudePid,
+          terminalApp,
+          cmuxPanelId,
+          cmuxTabId,
+          cmuxSurfaceId
+        };
+        state.status = 'working';
+        state.workingStartedAt = now;
+        state.lastUpdatedAt = now;
+        state.completedAt = null;
+        state.diedAt = null;
+        if (!state.pid) state.pid = claudePid;
+        if (!state.terminalApp && terminalApp) state.terminalApp = terminalApp;
+        if (!state.cmuxPanelId && cmuxPanelId) state.cmuxPanelId = cmuxPanelId;
+        if (!state.cmuxTabId && cmuxTabId) state.cmuxTabId = cmuxTabId;
+        if (!state.cmuxSurfaceId && cmuxSurfaceId) state.cmuxSurfaceId = cmuxSurfaceId;
+        writeStateAtomic(filePath, state);
         break;
       }
 

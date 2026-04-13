@@ -28,7 +28,9 @@ final class HealthCheckService: ObservableObject {
 
     private static let garbageCollectAge: TimeInterval = 24 * 60 * 60
     nonisolated(unsafe) private static var healthCheckCount = 0
-    nonisolated private static let scanEveryNChecks = 5
+    // Run process scan more often so untracked sessions (e.g., spawned in
+    // a terminal whose hooks override the menubar hook) are picked up sooner.
+    nonisolated private static let scanEveryNChecks = 2
 
     init(watcher: SessionDirectoryWatcher, settings: SettingsStore) {
         self.watcher = watcher
