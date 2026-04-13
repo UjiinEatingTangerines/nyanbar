@@ -97,7 +97,7 @@ node bin/nyanbar.js install
 1. Builds the app with Swift (`swift build -c release`)
 2. Creates a code-signed bundle at `~/Applications/ClaudeMenuBar.app`
 3. Copies the hook script to `~/.claude/scripts/hooks/`
-4. Registers 5 hooks in `~/.claude/settings.json` (SessionStart, PreToolUse, Stop, Notification, SessionEnd)
+4. Registers 5 hooks in `~/.claude/settings.json` (SessionStart, UserPromptSubmit, PreToolUse, Stop, SessionEnd)
 5. Installs a LaunchAgent (auto-start on login)
 6. Launches the app
 

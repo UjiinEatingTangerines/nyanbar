@@ -1,6 +1,6 @@
 {
   "name": "nyanbar",
-  "version": "1.8.9",
+  "version": "1.8.10",
   "description": "🐱 NyanBar — a macOS menu bar app for Claude Code sessions. Cat-loaf icon, rainbow notifications, session dashboard, multi-terminal support.",
   "author": "UjiinEatingTangerines",
   "license": "MIT",
