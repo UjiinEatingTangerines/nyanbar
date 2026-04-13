@@ -224,23 +224,6 @@ nyanbar/
 
 ---
 
-## Recent Stability Improvements
-
-NyanBar gets battle-tested against real Claude Code sessions every day. Recent work:
-
-| Version | Highlights |
-|---------|-----------|
-| **v1.8.7** | Surface recent stability work in the README so users can see the project is actively maintained. |
-| **v1.8.6** | Stop the `Notification` hook from creating phantom *pending* states after a session has already completed. Idle reminders no longer override `completed`/`idle`. |
-| **v1.8.5** | English-first README, GitHub stars badge, prominent star CTA. |
-| **v1.8.4** | Fix a `DispatchSource` cancel-handler race that could silently kill the file monitor after sleep/wake. Add 0.3s debounce to file events, merge health-check I/O into a single pass, drop rainbow overlay from 30fps → 20fps. |
-| **v1.8.3** | Full sleep/wake recovery: phantom popover reset, button action/target re-validation, full timer restart. Fixes "buttons don't respond after lid close/open". |
-| **v1.8.2** | Adaptive FPS (idle 3fps, working 5fps), reduced polling for low CPU usage. |
-| **v1.8.1** | Move health check to a background thread to prevent UI freeze. |
-| **v1.8.0** | Wake recovery + process scanner for universal session detection (works even without hooks). |
-
----
-
 ## Uninstall
 
 ```bash
