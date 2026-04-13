@@ -68,54 +68,85 @@ final class SessionDirectoryWatcher: ObservableObject {
         reload()
     }
 
-    /// Debounce rapid filesystem events into a single reload (0.3s window).
+    /// Debounce rapid filesystem events into a single reload (0.1s window).
+    /// The hook layer already debounces at 500ms, so filesystem-level events
+    /// rarely burst tighter than that; a tight 100ms window here keeps
+    /// first-event latency low while still collapsing simultaneous writes
+    /// to multiple session files into one reload.
     private func scheduleReload() {
         reloadDebounceTimer?.invalidate()
-        reloadDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
+        reloadDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.reload()
             }
         }
     }
 
+    /// Reload sessions off the main thread. File I/O, JSON decode, and sort
+    /// all happen on a background queue; only the final assignment to
+    /// `@Published sessions` lands back on main. Callers are fire-and-forget.
     func reload() {
+        let directoryURL = self.directoryURL
+        let staleThreshold = self.staleThreshold
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let loaded = Self.loadSessionsOffMain(
+                directoryURL: directoryURL,
+                staleThreshold: staleThreshold
+            )
+            DispatchQueue.main.async {
+                self?.sessions = loaded
+            }
+        }
+    }
+
+    /// Pure file I/O + decode + sort. Runs off the MainActor so the UI never
+    /// blocks on disk — even with dozens of session files or a slow volume.
+    nonisolated private static func loadSessionsOffMain(
+        directoryURL: URL,
+        staleThreshold: TimeInterval
+    ) -> [SessionState] {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(
             at: directoryURL,
             includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
         ) else {
-            sessions = []
-            return
+            return []
         }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
 
         let now = Date()
         var loaded: [SessionState] = []
-
         for fileURL in files where fileURL.pathExtension == "json" {
             guard let data = try? Data(contentsOf: fileURL),
                   let state = try? decoder.decode(SessionState.self, from: data),
                   state.schemaVersion == 1 else {
                 continue
             }
-
-            // Skip stale sessions
             if now.timeIntervalSince(state.lastUpdatedAt) > staleThreshold {
                 continue
             }
-
             loaded.append(state)
         }
-
         // Sort: working first (newest), then completed, then idle, then dead
         loaded.sort { a, b in
-            let orderA = statusOrder(a.status)
-            let orderB = statusOrder(b.status)
+            let orderA = statusOrderValue(a.status)
+            let orderB = statusOrderValue(b.status)
             if orderA != orderB { return orderA < orderB }
             return a.lastUpdatedAt > b.lastUpdatedAt
         }
+        return loaded
+    }
 
-        sessions = loaded
+    nonisolated private static func statusOrderValue(_ status: SessionStatus) -> Int {
+        switch status {
+        case .working: return 0
+        case .pending: return 1
+        case .completed: return 2
+        case .idle: return 3
+        case .dead: return 4
+        }
     }
 
     /// Write updated state back to disk (used by health check to mark dead)
@@ -147,9 +178,19 @@ final class SessionDirectoryWatcher: ObservableObject {
     // MARK: - Computed
 
     /// Stale threshold: if a "working" session hasn't updated in this many seconds,
-    /// it's likely waiting for user input (permission prompt, etc.)
-    /// 30 seconds to avoid false positives during long tool executions
-    private static let pendingThreshold: TimeInterval = 30
+    /// it's likely waiting for user input (permission prompt, etc.).
+    ///
+    /// 180s balances two goals:
+    ///   1. Long-running tools (Bash builds, test suites, slow fetches) can
+    ///      legitimately run for minutes without emitting a PostToolUse —
+    ///      PreToolUse fires at start, PostToolUse fires at end, nothing in
+    ///      between. A 30s threshold would incorrectly flip them to "pending".
+    ///   2. Truly stuck sessions (missed permission prompt, crashed API call)
+    ///      eventually surface as pending so the user knows to check.
+    ///
+    /// Permission prompts are caught immediately by the Notification hook, so
+    /// this threshold only matters when *all* signaling hooks miss.
+    private static let pendingThreshold: TimeInterval = 180
 
     var workingSessions: [SessionState] {
         sessions.filter { $0.status == .working && !isStaleWorking($0) }
@@ -198,16 +239,6 @@ final class SessionDirectoryWatcher: ObservableObject {
     }
 
     // MARK: - Private
-
-    private func statusOrder(_ status: SessionStatus) -> Int {
-        switch status {
-        case .working: return 0
-        case .pending: return 1
-        case .completed: return 2
-        case .idle: return 3
-        case .dead: return 4
-        }
-    }
 
     private func ensureDirectory() {
         try? FileManager.default.createDirectory(

@@ -149,6 +149,10 @@ nyanbar status      # Check installation status
 | Long-running tool heartbeat | PostToolUse hook refreshes `lastUpdatedAt` every tool completion | no false stale-working during long Bash/Edit chains |
 | Countdown tick waste | Countdown timer pauses while popover is closed | saves 86,400 ticks/day of SwiftUI re-evaluation |
 | Background timer wakes | `Timer.tolerance` on non-critical timers (poll 2s / refresh 5s / health 10%) | macOS coalesces wakes → better battery life |
+| Long tool execution | Stale-working threshold raised from 30s → 180s (Notification/Stop still detect real pending instantly) | 2-3 minute Bash/test runs stay "working", no false pending flicker |
+| Session reload I/O | File read + JSON decode + sort moved off the main thread | popover stays responsive even with many session files |
+| Redundant icon updates | `iconManager.update(state:)` short-circuits when the effective state is unchanged | no animation-timer thrash on busy `$sessions` publishes |
+| File event latency | DispatchSource debounce tightened 300ms → 100ms (hook layer already debounces at 500ms) | UI reacts within ~100ms of the first file event |
 | Process exited | PID health check | dead |
 | cmux tab closed | Surface validity check | dead |
 | Session without hook | Process scan (`ps`) | auto-discovered + tracked |

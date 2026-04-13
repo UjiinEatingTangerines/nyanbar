@@ -165,6 +165,11 @@ final class MenuBarIconManager {
     }
 
     func update(state: IconState) {
+        // Fast path: no-op when the effective icon state hasn't changed.
+        // AppDelegate.updateIcon fires on every $sessions publish, even when
+        // nothing material changed; without this guard we'd keep tearing down
+        // and recreating the animation timer at 10 Hz on a busy system.
+        if state == currentState { return }
         stopAnimation()
         statusItem.button?.alphaValue = 1.0  // Reset from pending pulse
         lastImageKey = nil  // force first frame after a state change
