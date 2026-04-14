@@ -12,6 +12,10 @@ final class HealthCheckService: ObservableObject {
     private let settings: SettingsStore
     var onHealthCheckDone: (() -> Void)?  // callback to trigger flash
 
+    /// L2: Serial queue — at most one health check runs at a time, preventing
+    /// thread accumulation when a check takes longer than the timer interval.
+    private let healthCheckQueue = DispatchQueue(label: "com.claudecode.menubar.healthcheck", qos: .utility)
+
     /// Seconds remaining until next health check (updated every second)
     var secondsRemaining: Int {
         guard let next = nextCheckAt else { return 0 }
@@ -90,8 +94,9 @@ final class HealthCheckService: ObservableObject {
         nextCheckAt = Date().addingTimeInterval(interval)
 
         let t = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            // Run health check on background thread to avoid blocking UI
-            DispatchQueue.global(qos: .utility).async {
+            // L2: Serial queue ensures at most one health check runs at a time,
+            // preventing thread pool exhaustion if a check blocks or runs slowly.
+            self?.healthCheckQueue.async {
                 self?.performHealthCheckBackground()
                 DispatchQueue.main.async {
                     self?.watcher.reload()

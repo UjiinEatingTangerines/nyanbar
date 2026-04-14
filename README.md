@@ -158,11 +158,11 @@ nyanbar status      # Check installation status
 | PreToolUse reliability | Removed debounce from `tool-use` too — Swift's 100ms DispatchSource debounce already caps reload rate, so hook-side debounce was only risking a dropped `toolStartedAt` when a slow tool followed a fast one | fast→slow tool sequences keep their stale-working grace |
 | Timestamp-refresh tick waste | Timestamp refresh timer now starts only when the popover first opens and pauses on close (same pattern as the countdown tick) | ~2,880 no-op SwiftUI re-evaluations per day saved when the popover stays closed |
 | Process exited | PID health check | dead |
-| cmux tab closed | Surface validity check | dead |
+| cmux tab closed | PID health check (process exits when tab closes) | dead |
 | Session without hook | Process scan (`ps`) | auto-discovered + tracked |
 | MacBook woken from sleep | Sleep/Wake notifications + phantom popover reset + full timer restart + button re-validation | auto-recovered |
 | UI freeze prevention | Background health check + adaptive FPS (idle 3fps, working 5fps) | CPU ~4%, no main-thread blocking |
-| Rapid file changes | DispatchSource events with 0.3s debounce | no reload storms |
+| Rapid file changes | DispatchSource events with 0.1s debounce | no reload storms |
 | Resource efficiency | Single-pass health-check I/O + 20fps rainbow | reduced CPU & memory |
 
 ---

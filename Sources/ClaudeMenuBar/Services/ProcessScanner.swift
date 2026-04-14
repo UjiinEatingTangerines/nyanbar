@@ -118,7 +118,7 @@ struct ProcessScanner {
         return nil
     }
 
-    private static func runShell(_ command: String) -> String? {
+    private static func runShell(_ command: String, timeout: TimeInterval = 10) -> String? {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", command]
@@ -128,9 +128,22 @@ struct ProcessScanner {
 
         do {
             try task.run()
-            task.waitUntilExit()
-            guard task.terminationStatus == 0 else { return nil }
+
+            // L3: Deadline — terminate child if it exceeds timeout (prevents
+            // indefinite hangs from slow lsof, stuck NFS, etc.)
+            let deadline = DispatchWorkItem {
+                if task.isRunning { task.terminate() }
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
+
+            // L1: Read FIRST, wait SECOND — prevents pipe buffer deadlock.
+            // waitUntilExit before readDataToEndOfFile deadlocks when output
+            // exceeds the 64 KB pipe buffer (ps output grows with process count).
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
+            deadline.cancel()
+
+            guard task.terminationStatus == 0 else { return nil }
             return String(data: data, encoding: .utf8)
         } catch {
             return nil
