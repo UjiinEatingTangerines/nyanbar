@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if let button = statusItem.button {
             button.action = #selector(togglePopover(_:))
             button.target = self
-            button.setAccessibilityLabel("Claude Code Sessions")
+            button.setAccessibilityLabel("NyanBar provider sessions")
         }
 
         // Popover anchored to status item button
@@ -66,6 +66,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.contentViewController = NSHostingController(rootView: contentView)
 
         watcher.startWatching()
+        settings.$enabledProviders
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.watcher.applyProviderPreferences() }
+            .store(in: &cancellables)
         healthCheck.onHealthCheckDone = { [weak self] in
             guard let self, !self.iconManager.isShowingRainbow else { return }
             self.iconManager.update(state: .healthCheckDone)

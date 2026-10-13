@@ -1,8 +1,7 @@
 import Foundation
 import Darwin
 
-/// Scans running processes to discover Claude Code sessions
-/// that weren't tracked by hooks. Optimized for minimal shell spawning.
+/// Local process presence only: never infers task activity or completion.
 struct ProcessScanner {
 
     struct DiscoveredSession {
@@ -10,24 +9,32 @@ struct ProcessScanner {
         let projectName: String
         let workingDirectory: String
         let terminalApp: String?
+        let provider: MonitoredProvider
+        let profilePath: String?
+
+        func state(now: Date = Date()) -> SessionState {
+            SessionState(schemaVersion: 1, sessionId: "process-\(provider.rawValue)-\(pid)",
+                status: .running, projectName: projectName, workingDirectory: workingDirectory,
+                startedAt: now, lastUpdatedAt: now, pid: pid, providerID: provider.rawValue,
+                observationSource: "process", profilePath: profilePath, terminalApp: terminalApp)
+        }
     }
 
-    /// Find all running Claude Code processes and return untracked ones.
-    /// Uses a single `ps` call + selective `lsof` only for new PIDs.
-    static func findUntrackedSessions(existingPids: Set<Int>) -> [DiscoveredSession] {
-        // Single ps call to get all processes with pid, ppid, command
+    /// A single process table per poll; lsof reads paths, never file contents.
+    static func findUntrackedSessions(existingPids: Set<Int>,
+                                      enabledProviders: Set<MonitoredProvider>) -> [DiscoveredSession] {
+        guard !enabledProviders.isEmpty else { return [] }
         let allProcs = getAllProcesses()
-        let claudeProcs = allProcs.filter { isClaudeProcess($0.command) }
+        let candidates = selectProcesses(allProcs, existingPids: existingPids, enabledProviders: enabledProviders)
+        let homes = enabledProviders.contains(.codex) ? CodexHomeDiscovery.discover() : []
 
         var untracked: [DiscoveredSession] = []
 
-        for proc in claudeProcs {
-            guard !existingPids.contains(proc.pid) else { continue }
-            guard isMainClaudeProcess(command: proc.command) else { continue }
+        for (proc, provider) in candidates {
 
-            // Only call lsof for truly new PIDs (expensive)
+            // Revalidate metadata each poll; do not retain PID identity across exits.
             let cwd = getProcessCwd(pid: proc.pid) ?? "/"
-            let projectName = URL(fileURLWithPath: cwd).lastPathComponent
+            let projectName = cwd == "/" ? provider.displayName : URL(fileURLWithPath: cwd).lastPathComponent
 
             // Walk parent chain using cached process table (no extra ps calls)
             let terminal = identifyTerminal(pid: proc.pid, processTable: allProcs)
@@ -36,7 +43,10 @@ struct ProcessScanner {
                 pid: proc.pid,
                 projectName: projectName,
                 workingDirectory: cwd,
-                terminalApp: terminal
+                terminalApp: terminal,
+                provider: provider,
+                profilePath: provider == .codex
+                    ? CodexHomeDiscovery.associatedHome(openPaths: openFilePaths(pid: proc.pid), homes: homes)?.path : nil
             ))
         }
 
@@ -53,7 +63,7 @@ struct ProcessScanner {
 
     /// Single `ps` call to build full process table
     private static func getAllProcesses() -> [ProcessInfo] {
-        guard let output = runShell("ps -eo pid,ppid,command") else { return [] }
+        guard let output = runShell("/bin/ps -ww -U \(getuid()) -o pid,ppid,command") else { return [] }
 
         var results: [ProcessInfo] = []
         for line in output.split(separator: "\n").dropFirst() { // skip header
@@ -68,21 +78,78 @@ struct ProcessScanner {
         return results
     }
 
-    private static func isClaudeProcess(_ command: String) -> Bool {
-        command.contains("/claude") || command.hasPrefix("claude ") || command == "claude"
+    /// Recognize argv[0], or a known node package entry point; never search arguments.
+    /// ps does not quote spaces reliably, so desktop entry points are anchored explicitly.
+    static func provider(for command: String) -> MonitoredProvider? {
+        let apps: [(String, String, MonitoredProvider)] = [
+            ("Cursor", "Cursor", .cursor), ("Codex", "Codex", .codex),
+            ("Antigravity", "Electron", .antigravity), ("Antigravity", "Antigravity", .antigravity),
+            ("Devin", "Devin", .devin), ("Devin", "Electron", .devin),
+            ("Ollama", "Ollama", .ollama), ("OpenCode", "OpenCode", .opencode),
+            ("OpenCode", "opencode", .opencode)
+        ]
+        for (app, executable, provider) in apps {
+            let pattern = "^\"?/[^\\s\"]*?/" + app + "\\.app/Contents/MacOS/" + executable + "(?:\"?(?:\\s|$))"
+            if command.range(of: pattern, options: .regularExpression) != nil { return provider }
+        }
+        let tokens = command.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard let first = tokens.first else { return nil }
+        let executable = URL(fileURLWithPath: first.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))).lastPathComponent
+        let names: [String: MonitoredProvider] = [
+            "claude": .claude, "codex": .codex, "cursor-agent": .cursor,
+            "agent": .cursor, "agy": .antigravity, "antigravity": .antigravity,
+            "copilot": .copilot, "devin": .devin, "grok": .grok,
+            "ollama": .ollama, "opencode": .opencode
+        ]
+        // 'agent' is generic: only Cursor's own install path is attributable.
+        if executable == "agent" {
+            return first.contains("/.local/share/cursor-agent/") ? .cursor : nil
+        }
+        if let provider = names[executable] { return provider }
+        guard ["node", "nodejs", "bun"].contains(executable), tokens.count > 1 else { return nil }
+        let script = tokens[1]
+        let entries: [(String, MonitoredProvider)] = [
+            ("/@anthropic-ai/claude-code/cli.js", .claude),
+            ("/@openai/codex/bin/codex.js", .codex),
+            ("/@github/copilot/index.js", .copilot),
+            ("/opencode-ai/bin/opencode", .opencode)
+        ]
+        return entries.first { script.hasSuffix($0.0) }?.1
     }
 
-    private static func isMainClaudeProcess(command: String) -> Bool {
-        if command.contains("node ") { return false }
-        if command.contains("menubar-session-update") { return false }
-        if command.contains("run-with-flags") { return false }
-        if command.contains("ClaudeMenuBar") { return false }
-        return true
+    static func selectProcesses(_ processes: [ProcessInfo], existingPids: Set<Int>,
+                                enabledProviders: Set<MonitoredProvider>) -> [(ProcessInfo, MonitoredProvider)] {
+        let table = Dictionary(processes.map { ($0.pid, $0) }, uniquingKeysWith: { a, _ in a })
+        func ancestors(_ pid: Int) -> Set<Int> {
+            var seen = Set<Int>()
+            var next = table[pid]?.ppid ?? 0
+            while next > 1 && seen.insert(next).inserted { next = table[next]?.ppid ?? 0 }
+            return seen
+        }
+        let recognized = processes.compactMap { proc -> (ProcessInfo, MonitoredProvider)? in
+            guard let provider = provider(for: proc.command), enabledProviders.contains(provider), provider.canMonitor else { return nil }
+            return (proc, provider)
+        }
+        let hookAncestors = existingPids.reduce(into: Set<Int>()) { $0.formUnion(ancestors($1)) }
+        return recognized.filter { proc, provider in
+            let parents = ancestors(proc.pid)
+            guard !existingPids.contains(proc.pid), !hookAncestors.contains(proc.pid),
+                  parents.isDisjoint(with: existingPids) else { return false }
+            // One observation per provider process tree, even across shell intermediaries.
+            return !recognized.contains { other, otherProvider in
+                otherProvider == provider && parents.contains(other.pid)
+            }
+        }
+    }
+
+    private static func openFilePaths(pid: Int) -> [String] {
+        guard let output = runShell("/usr/sbin/lsof -a -p \(pid) -Fn 2>/dev/null") else { return [] }
+        return output.split(separator: "\n").filter { $0.hasPrefix("n/") }.map { String($0.dropFirst()) }
     }
 
     /// Get cwd via lsof (only for new PIDs)
     private static func getProcessCwd(pid: Int) -> String? {
-        guard let output = runShell("lsof -p \(pid) -d cwd -Fn 2>/dev/null") else { return nil }
+        guard let output = runShell("/usr/sbin/lsof -a -p \(pid) -d cwd -Fn 2>/dev/null") else { return nil }
         for line in output.split(separator: "\n") {
             let s = String(line)
             if s.hasPrefix("n/") { return String(s.dropFirst()) }

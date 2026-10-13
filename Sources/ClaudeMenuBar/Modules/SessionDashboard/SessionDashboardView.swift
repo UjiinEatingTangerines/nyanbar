@@ -31,7 +31,7 @@ struct SessionDashboardView: View {
                 Text(lang.noActiveSessions)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
-                Text(lang.startSessionHint)
+                Text("Enable providers in Settings, then open a local tool. Process presence is not task activity.")
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
@@ -46,6 +46,13 @@ struct SessionDashboardView: View {
     private var sessionList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                SessionGroupView(
+                    title: "Running · task state unknown",
+                    icon: "app.dashed",
+                    color: .secondary,
+                    sessions: watcher.runningSessions,
+                    onFocus: { onFocusSession?($0) }
+                )
                 SessionGroupView(
                     title: lang.workingGroup,
                     icon: "circle.fill",

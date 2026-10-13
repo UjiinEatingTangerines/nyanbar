@@ -24,6 +24,16 @@ struct SessionCardView: View {
 
             // Content
             VStack(alignment: .leading, spacing: 3) {
+                Text(session.providerDisplayName)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                if session.provider == .codex {
+                    Text(session.profilePath.map { "Home/profile: \($0) (account unverified)" }
+                         ?? "Home/profile unknown · account unverified")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
                 // Project name + terminal app badge
                 HStack(spacing: 6) {
                     Text(session.displayProjectName)
@@ -137,6 +147,8 @@ struct SessionCardView: View {
     @ViewBuilder
     private var timeLabel: some View {
         switch session.status {
+        case .running:
+            Text("Running · task state unknown")
         case .working:
             Text(RelativeTimeFormatter.durationString(from: session.startedAt))
         case .pending:
@@ -162,6 +174,7 @@ struct SessionCardView: View {
 
     private var dotColor: Color {
         switch session.status {
+        case .running: .secondary
         case .working: .green
         case .pending: .orange
         case .completed: .blue

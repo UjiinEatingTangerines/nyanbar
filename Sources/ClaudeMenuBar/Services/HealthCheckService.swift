@@ -30,11 +30,6 @@ final class HealthCheckService: ObservableObject {
         return String(format: "%d:%02d", m, s)
     }
 
-    private static let garbageCollectAge: TimeInterval = 24 * 60 * 60
-    nonisolated(unsafe) private static var healthCheckCount = 0
-    // Run process scan more often so untracked sessions (e.g., spawned in
-    // a terminal whose hooks override the menubar hook) are picked up sooner.
-    nonisolated private static let scanEveryNChecks = 2
 
     init(watcher: SessionDirectoryWatcher, settings: SettingsStore) {
         self.watcher = watcher
@@ -138,7 +133,7 @@ final class HealthCheckService: ObservableObject {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = .prettyPrinted
 
-        var existingPids = Set<Int>()
+        let enabled = ProviderPreferences.load()
         let gcAge: TimeInterval = 24 * 60 * 60
         let now = Date()
 
@@ -147,7 +142,12 @@ final class HealthCheckService: ObservableObject {
             guard let data = try? Data(contentsOf: fileURL),
                   var session = try? decoder.decode(SessionState.self, from: data) else { continue }
 
-            if let pid = session.pid { existingPids.insert(pid) }
+            // Live process observations belong to the watcher, not hook files.
+            if session.isProcessObservation {
+                try? FileManager.default.removeItem(at: fileURL)
+                continue
+            }
+            guard session.provider.map(enabled.contains) ?? false else { continue }
 
             // GC: delete 24h+ old non-working sessions
             if session.status != .working {
@@ -197,38 +197,7 @@ final class HealthCheckService: ObservableObject {
             }
         }
 
-        // 4. Process scan (every 5th check)
-        Self.healthCheckCount += 1
-        if Self.healthCheckCount % Self.scanEveryNChecks == 0 {
-            let untracked = ProcessScanner.findUntrackedSessions(existingPids: existingPids)
-            for discovered in untracked {
-                let state = SessionState(
-                    schemaVersion: 1,
-                    sessionId: "pid-\(discovered.pid)",
-                    status: .working,
-                    projectName: discovered.projectName,
-                    workingDirectory: discovered.workingDirectory,
-                    startedAt: now,
-                    lastUpdatedAt: now,
-                    lastMessage: nil,
-                    lastToolName: nil,
-                    completedAt: nil,
-                    diedAt: nil,
-                    pid: discovered.pid,
-                    terminalApp: discovered.terminalApp,
-                    cmuxPanelId: nil,
-                    cmuxTabId: nil,
-                    cmuxSurfaceId: nil
-                )
-                if let encoded = try? encoder.encode(state) {
-                    let safeId = state.sessionId.replacingOccurrences(
-                        of: "[^a-zA-Z0-9_-]", with: "_", options: .regularExpression
-                    )
-                    let url = sessionsDir.appendingPathComponent("\(safeId).json")
-                    try? encoded.write(to: url, options: .atomic)
-                }
-            }
-        }
+
     }
 
 }

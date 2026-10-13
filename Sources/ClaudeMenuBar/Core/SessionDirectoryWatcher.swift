@@ -14,6 +14,9 @@ final class SessionDirectoryWatcher: ObservableObject {
     private var reloadDebounceTimer: Timer?
     private let decoder: JSONDecoder
     private var wakeObserver: Any?
+    private let reloadQueue = DispatchQueue(label: "app.nyanbar.sessions", qos: .utility)
+    private var reloadInFlight = false
+    private var reloadRequested = false
 
     init(
         directoryURL: URL? = nil,
@@ -86,22 +89,36 @@ final class SessionDirectoryWatcher: ObservableObject {
     /// all happen on a background queue; only the final assignment to
     /// `@Published sessions` lands back on main. Callers are fire-and-forget.
     func reload() {
+        guard !reloadInFlight else { reloadRequested = true; return }
+        reloadInFlight = true
         let directoryURL = self.directoryURL
         let staleThreshold = self.staleThreshold
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        reloadQueue.async { [weak self] in
+            let enabled = ProviderPreferences.load()
             let loaded = Self.loadSessionsOffMain(
                 directoryURL: directoryURL,
                 staleThreshold: staleThreshold
-            )
+            ).filter { $0.provider.map(enabled.contains) ?? false }
+            let hookPids = Set(loaded.filter { $0.status != .dead }.compactMap(\.pid))
+            let observed = ProcessScanner.findUntrackedSessions(existingPids: hookPids, enabledProviders: enabled)
+                .map { $0.state() }
             DispatchQueue.main.async {
-                self?.sessions = loaded
+                guard let self else { return }
+                // A toggle may have changed while the scan was in progress.
+                let current = ProviderPreferences.load()
+                self.sessions = (loaded + observed).filter { $0.provider.map(current.contains) ?? false }
+                self.reloadInFlight = false
+                if self.reloadRequested {
+                    self.reloadRequested = false
+                    self.reload()
+                }
             }
         }
     }
 
     /// Pure file I/O + decode + sort. Runs off the MainActor so the UI never
     /// blocks on disk — even with dozens of session files or a slow volume.
-    nonisolated private static func loadSessionsOffMain(
+    nonisolated static func loadSessionsOffMain(
         directoryURL: URL,
         staleThreshold: TimeInterval
     ) -> [SessionState] {
@@ -124,6 +141,9 @@ final class SessionDirectoryWatcher: ObservableObject {
                   state.schemaVersion == 1 else {
                 continue
             }
+            // Only explicitly marked process observations are synthetic.
+            // Real Claude hooks also use pid-* identifiers as a fallback.
+            guard !state.isProcessObservation else { continue }
             if now.timeIntervalSince(state.lastUpdatedAt) > staleThreshold {
                 continue
             }
@@ -141,6 +161,7 @@ final class SessionDirectoryWatcher: ObservableObject {
 
     nonisolated private static func statusOrderValue(_ status: SessionStatus) -> Int {
         switch status {
+        case .running: return 3
         case .working: return 0
         case .pending: return 1
         case .completed: return 2
@@ -233,7 +254,15 @@ final class SessionDirectoryWatcher: ObservableObject {
 
     /// Active sessions (Sessions tab)
     var activeSessions: [SessionState] {
-        workingSessions + pendingSessions
+        workingSessions + pendingSessions + runningSessions
+    }
+
+    var runningSessions: [SessionState] { sessions.filter { $0.status == .running } }
+
+    func applyProviderPreferences() {
+        let enabled = ProviderPreferences.load()
+        sessions = sessions.filter { $0.provider.map(enabled.contains) ?? false }
+        reload()
     }
 
     /// History sessions (History tab): completed, idle, dead
@@ -241,7 +270,7 @@ final class SessionDirectoryWatcher: ObservableObject {
         sessions.filter { [.completed, .idle, .dead].contains($0.status) }
     }
 
-    var activeCount: Int { workingSessions.count + pendingSessions.count }
+    var activeCount: Int { activeSessions.count }
     var historyCount: Int { historySessions.count }
     var totalCount: Int { sessions.count }
 

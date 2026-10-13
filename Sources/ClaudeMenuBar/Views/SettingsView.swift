@@ -47,6 +47,10 @@ struct SettingsView: View {
                     }
                 }
 
+                settingsCard {
+                    ProviderSettingsView(settings: settings)
+                }
+
                 // Language
                 settingsCard {
                     VStack(alignment: .leading, spacing: 10) {

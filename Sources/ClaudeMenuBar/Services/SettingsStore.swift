@@ -33,6 +33,15 @@ struct SpinnerMessage: Codable, Identifiable, Equatable {
 }
 
 final class SettingsStore: ObservableObject {
+    @Published var enabledProviders: Set<MonitoredProvider> = ProviderPreferences.load() {
+        didSet { ProviderPreferences.save(enabledProviders) }
+    }
+
+    func setProvider(_ provider: MonitoredProvider, enabled: Bool) {
+        guard provider.canMonitor else { return }
+        if enabled { enabledProviders.insert(provider) } else { enabledProviders.remove(provider) }
+    }
+
     @Published var selectedInterval: HealthCheckInterval {
         didSet { UserDefaults.standard.set(selectedInterval.rawValue, forKey: "healthCheckIntervalRawValue") }
     }

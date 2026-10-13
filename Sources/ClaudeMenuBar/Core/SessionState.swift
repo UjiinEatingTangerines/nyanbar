@@ -1,6 +1,7 @@
 import Foundation
 
 enum SessionStatus: String, Codable, CaseIterable {
+    case running   // process observed; task activity is unknown
     case working
     case pending   // waiting for user input (AskUserQuestion, etc.)
     case completed
@@ -21,6 +22,18 @@ struct SessionState: Codable, Identifiable, Equatable {
     var completedAt: Date?
     var diedAt: Date?
     var pid: Int?
+    // Optional fields preserve decoding of existing schema-1 Claude hook files.
+    var providerID: String? = nil
+    var observationSource: String? = nil
+    var profilePath: String? = nil
+
+    var provider: MonitoredProvider? {
+        MonitoredProvider(rawValue: providerID ?? "claude")
+    }
+    var providerDisplayName: String { provider?.displayName ?? providerID ?? "Unknown" }
+    var isProcessObservation: Bool {
+        observationSource == "process"
+    }
 
     /// When the *currently running* tool started. Set by PreToolUse,
     /// cleared by PostToolUse / Stop / UserPromptSubmit. Lets the stale
