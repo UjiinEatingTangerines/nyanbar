@@ -73,6 +73,7 @@ struct SessionState: Codable, Identifiable, Equatable {
         case "Apple_Terminal", "com.apple.Terminal": return "Terminal"
         case "vscode", "com.microsoft.VSCode": return "VS Code"
         case "WarpTerminal", "dev.warp.Warp-Stable": return "Warp"
+        case "com.stablyai.orca": return "Orca"
         default:
             if app.contains(".") { return app.components(separatedBy: ".").last }
             return app

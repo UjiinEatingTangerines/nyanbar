@@ -23,7 +23,34 @@ enum MonitoredProvider: String, Codable, CaseIterable, Identifiable {
         }
     }
     var canMonitor: Bool { self != .openrouter && self != .zai }
-    var capability: String {
+    func capability(in language: AppLanguage) -> String {
+        switch language {
+        case .korean:
+            switch self {
+            case .claude: return "Claude Code 훅: 작업 중, 입력 대기, 완료 감지. 프로세스로 감지할 때는 실행 여부만 확인합니다."
+            case .codex: return "CLI / 앱 프로세스만 감지합니다. 여러 홈 폴더는 프로필로 표시되며, 확인된 계정이 아닙니다."
+            case .cursor: return "Cursor 앱 / cursor-agent 프로세스만 감지합니다. 에이전트 작업 상태는 알 수 없습니다."
+            case .copilot: return "Copilot CLI만 감지합니다. 편집기 확장과 사용량 한도는 모니터링하지 않습니다."
+            case .ollama: return "로컬 앱 / CLI / 서버 프로세스만 감지합니다. 생성 상태와 Cloud 사용량 한도는 알 수 없습니다."
+            case .openrouter, .zai: return "지원 안 됨: 로컬 프로세스로 식별할 수 없는 API 서비스입니다. 사용량 한도 연동은 구현되지 않았습니다."
+            default: return "로컬 앱 / CLI 프로세스만 감지합니다. 작업 상태, 완료 여부, 사용량 한도는 알 수 없습니다."
+            }
+        case .japanese:
+            switch self {
+            case .claude: return "Claude Codeフック: 作業中、入力待ち、完了を検出。プロセスによる検出では実行の有無のみ確認します。"
+            case .codex: return "CLI / アプリのプロセスのみ検出。複数のホームはプロファイルとして表示され、確認済みアカウントではありません。"
+            case .cursor: return "Cursorアプリ / cursor-agentのプロセスのみ検出。エージェントのタスク状態は不明です。"
+            case .copilot: return "Copilot CLIのみ検出。エディター拡張と使用量上限は監視しません。"
+            case .ollama: return "ローカルアプリ / CLI / サーバーのプロセスのみ検出。生成状態やCloudの使用量上限は不明です。"
+            case .openrouter, .zai: return "未対応: 特定できるローカルプロセスのないAPIサービスです。使用量上限の連携は未実装です。"
+            default: return "ローカルアプリ / CLIのプロセスのみ検出。タスク状態、完了、使用量上限は不明です。"
+            }
+        case .english:
+            return englishCapability
+        }
+    }
+
+    private var englishCapability: String {
         switch self {
         case .claude: "Claude Code hooks: working, input, completion; process fallback: running only."
         case .codex: "CLI / app process only. Multiple homes shown as profiles, never verified accounts."

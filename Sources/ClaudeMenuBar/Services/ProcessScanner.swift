@@ -158,7 +158,7 @@ struct ProcessScanner {
     }
 
     /// Walk parent chain using cached process table (zero extra shell calls)
-    private static func identifyTerminal(pid: Int, processTable: [ProcessInfo]) -> String? {
+    static func identifyTerminal(pid: Int, processTable: [ProcessInfo]) -> String? {
         let pidMap = Dictionary(processTable.map { ($0.pid, $0) }, uniquingKeysWith: { first, _ in first })
         var currentPid = pid
         var depth = 0
@@ -169,6 +169,7 @@ struct ProcessScanner {
 
             if let parent = pidMap[ppid] {
                 let cmd = parent.command.lowercased()
+                if cmd.hasPrefix("/") && cmd.contains("/orca.app/contents/") { return "com.stablyai.orca" }
                 if cmd.contains("cmux") { return "cmux" }
                 if cmd.contains("iterm") { return "iTerm2" }
                 if cmd.contains("terminal") && cmd.contains("apple") { return "Apple_Terminal" }

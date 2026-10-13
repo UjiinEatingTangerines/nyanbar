@@ -27,7 +27,7 @@ source += '\n@main struct TestRunner { static func main() throws {\nlet tests = 
 for name in methods:
     source += f'try tests.{name}()\nprint("PASS {name}")\n'
 source += f'print("Passed {len(methods)} provider regression tests")\n}}}}\n'
-files = ['Core/MonitoredProvider.swift', 'Core/SessionState.swift', 'Core/SessionDirectoryWatcher.swift',
+files = ['Core/AppLanguage.swift', 'Core/MonitoredProvider.swift', 'Core/SessionState.swift', 'Core/SessionDirectoryWatcher.swift',
          'Services/ProcessScanner.swift', 'Services/CodexHomeDiscovery.swift']
 with tempfile.TemporaryDirectory(prefix='nyanbar-tests-') as temp:
     runner = Path(temp) / 'Runner.swift'

@@ -34,13 +34,18 @@ struct CodexHomeDiscovery {
         }
     }
 
-    /// Only an actually open session file associates a process with a home.
+    /// An open session file or Codex's per-process arg0 lock associates a home.
     /// Folder existence, cwd and inherited GUI environment do not prove identity.
     static func associatedHome(openPaths: [String], homes: [Home]) -> Home? {
         let matches = homes.filter { home in
             openPaths.contains { path in
                 let canonical = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
-                return canonical.hasPrefix(home.path + "/sessions/") && canonical.hasSuffix(".jsonl")
+                let session = canonical.hasPrefix(home.path + "/sessions/") && canonical.hasSuffix(".jsonl")
+                let lockPrefix = home.path + "/tmp/arg0/"
+                let relative = canonical.hasPrefix(lockPrefix) ? String(canonical.dropFirst(lockPrefix.count)) : ""
+                let parts = relative.split(separator: "/")
+                let runtimeLock = parts.count == 2 && parts[0].hasPrefix("codex-arg0") && parts[1] == ".lock"
+                return session || runtimeLock
             }
         }
         return matches.count == 1 ? matches[0] : nil

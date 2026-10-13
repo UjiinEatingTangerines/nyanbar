@@ -15,7 +15,7 @@ Provider names identify the client tool, not which model or billing account it u
 
 ## Codex profiles
 
-Directory discovery includes CODEX_HOME inherited by NyanBar, ~/.codex, ~/.config/codex, ~/.codex-* and ~/.config/codex-*. Canonical paths deduplicate symlinks. This discovers directories, not authenticated accounts. Shell alias names are not recovered. A process is associated with a home only when lsof reports an open session JSONL file under exactly one discovered home. Otherwise the profile remains unknown. Authentication-based account deduplication, arbitrary custom homes hidden only in shell aliases, and account switching within a shared home are not implemented.
+Directory discovery includes CODEX_HOME inherited by NyanBar, ~/.codex, ~/.config/codex, ~/.codex-* and ~/.config/codex-*. Canonical paths deduplicate symlinks. This discovers directories, not authenticated accounts. Shell alias names are not recovered. A process is associated with a home when lsof reports an open session JSONL or the per-process `tmp/arg0/codex-arg0*/.lock` under exactly one discovered home. Missing or conflicting evidence leaves the profile unknown. Binary install paths and authentication files are not identity evidence. Authentication-based account deduplication, arbitrary custom homes hidden only in shell aliases, and account switching within a shared home are not implemented.
 
 ## Verification
 
@@ -29,6 +29,10 @@ SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk python3 scripts/
 git diff --check
 ```
 
-The fallback runner compiles the actual production Swift files and executes the same test bodies using plain Swift assertions, without Testing macros. It does not replace production code with mocks. Nine tests cover catalog, settings persistence, executable matching/false positives, tree deduplication, legacy decoding (including real pid-* hook IDs), Codex home boundaries, and file loading. The process smoke test starts a temporary /bin/sleep symlink named opencode to verify real ps/lsof discovery, opt-out and exit; it is not a claim that the OpenCode application itself was exercised.
+The fallback runner compiles the actual production Swift files and executes the same test bodies using plain Swift assertions, without Testing macros. It does not replace production code with mocks. Twelve tests cover Korean localization, Orca terminal ancestry, runtime lock evidence, catalog, settings persistence, executable matching/false positives, tree deduplication, legacy decoding (including real pid-* hook IDs), Codex home boundaries, and file loading. The process smoke test starts a temporary /bin/sleep symlink named opencode to verify real ps/lsof discovery, opt-out and exit; it is not a claim that the OpenCode application itself was exercised.
 
-Release build and these tests passed. GUI interaction, every vendor binary, quota integration and authenticated account matching were not exercised. The installed NyanBar application has not been replaced or restarted. A pre-existing NSCache Sendable warning remains.
+For read-only live verification, run `SDKROOT=/path/to/compatible.sdk python3 scripts/diagnose-monitoring.py --output /private/path/result.json`. It compares production-scanner observations to an independent OS executable-path snapshot and separately checks the persisted provider selection. Outputs include PIDs and profile directory basenames but omit command arguments, project paths and credentials. Do not commit personal probe outputs.
+
+Provider settings and session labels follow the existing Korean/Japanese/English setting, including changes while a card is visible. Orca terminal ancestors are recognized by their app path; card focus activates Orca, not a specific tab.
+
+Release build and these tests passed. Live Codex and Devin process detection was exercised; GUI interaction, every vendor binary, quota integration and authenticated account matching were not all exercised. A pre-existing NSCache Sendable warning remains.

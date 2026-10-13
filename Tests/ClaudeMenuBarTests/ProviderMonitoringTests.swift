@@ -3,6 +3,39 @@ import Foundation
 @testable import ClaudeMenuBar
 
 struct ProviderMonitoringTests {
+    @Test func koreanProviderStringsHaveNoEnglishFallback() {
+        let language = AppLanguage.korean
+        let strings = [language.providerMonitoringTitle, language.providerMonitoringDescription,
+            language.runningTaskUnknown, language.providerSessionHint, language.codexProfilesTitle,
+            language.codexProfilesDescription, language.noCodexHomes, language.refreshCodexHomes,
+            language.providerCatalogSource, language.codexProfileLabel(path: nil),
+            language.codexProfileLabel(path: "/tmp/.codex-work"), language.dismissSession,
+            language.providerSessionsAccessibilityLabel] + MonitoredProvider.allCases.map { $0.capability(in: language) }
+        for text in strings {
+            #expect(text.unicodeScalars.contains { (0xAC00...0xD7A3).contains($0.value) })
+        }
+        #expect(language.runningTaskUnknown != AppLanguage.english.runningTaskUnknown)
+        #expect(AppLanguage.japanese.providerMonitoringTitle != language.providerMonitoringTitle)
+    }
+
+    @Test func orcaTerminalAncestor() {
+        let table: [ProcessScanner.ProcessInfo] = [
+            .init(pid: 100, ppid: 99, command: "codex"),
+            .init(pid: 99, ppid: 98, command: "node"),
+            .init(pid: 98, ppid: 97, command: "zsh"),
+            .init(pid: 97, ppid: 1, command: "/Applications/Orca.app/Contents/Frameworks/Orca Helper.app/Contents/MacOS/Orca Helper")
+        ]
+        #expect(ProcessScanner.identifyTerminal(pid: 100, processTable: table) == "com.stablyai.orca")
+    }
+
+    @Test func codexHomeOpenRuntimeLockEvidence() {
+        let homes = [CodexHomeDiscovery.Home(path: "/tmp/.codex"), CodexHomeDiscovery.Home(path: "/tmp/.codex-work")]
+        #expect(CodexHomeDiscovery.associatedHome(openPaths: ["/tmp/.codex-work/tmp/arg0/codex-arg0ABC/.lock"], homes: homes) == homes[1])
+        #expect(CodexHomeDiscovery.associatedHome(openPaths: ["/tmp/.codex-work/packages/bin/codex"], homes: homes) == nil)
+        #expect(CodexHomeDiscovery.associatedHome(openPaths: ["/tmp/.codex-work/tmp/unrelated/.lock"], homes: homes) == nil)
+        #expect(CodexHomeDiscovery.associatedHome(openPaths: ["/tmp/.codex-work/tmp/arg0/codex-arg0ABC/.lock", "/tmp/.codex/sessions/x.jsonl"], homes: homes) == nil)
+    }
+
     @Test func liveProcessDiscoveryAndExit() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

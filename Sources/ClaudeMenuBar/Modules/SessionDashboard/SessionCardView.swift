@@ -6,6 +6,7 @@ struct SessionCardView: View {
     var onFocus: (() -> Void)?
 
     @State private var isHovering = false
+    @AppStorage("appLanguage") private var languageCode = "ko"
 
     var body: some View {
         Button {
@@ -28,8 +29,7 @@ struct SessionCardView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
                 if session.provider == .codex {
-                    Text(session.profilePath.map { "Home/profile: \($0) (account unverified)" }
-                         ?? "Home/profile unknown · account unverified")
+                    Text(currentLanguage.codexProfileLabel(path: session.profilePath))
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
@@ -96,7 +96,7 @@ struct SessionCardView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
-                .help("Dismiss")
+                .help(currentLanguage.dismissSession)
             } else if session.canFocusTerminal {
                 Image(systemName: "arrow.up.forward.app")
                     .font(.system(size: 11))
@@ -118,7 +118,7 @@ struct SessionCardView: View {
     // MARK: - Computed
 
     private var currentLanguage: AppLanguage {
-        AppLanguage(rawValue: UserDefaults.standard.string(forKey: "appLanguage") ?? "ko") ?? .korean
+        AppLanguage(rawValue: languageCode) ?? .korean
     }
 
     private var shortenedPath: String {
@@ -148,24 +148,24 @@ struct SessionCardView: View {
     private var timeLabel: some View {
         switch session.status {
         case .running:
-            Text("Running · task state unknown")
+            Text(currentLanguage.runningTaskUnknown)
         case .working:
             Text(RelativeTimeFormatter.durationString(from: session.startedAt))
         case .pending:
             Text(currentLanguage.waitingForInput)
         case .completed:
             if let completedAt = session.completedAt {
-                Text("done \(RelativeTimeFormatter.string(from: completedAt))")
+                Text("\(currentLanguage.completedGroup) \(RelativeTimeFormatter.string(from: completedAt))")
             } else {
-                Text("completed")
+                Text(currentLanguage.completedGroup)
             }
         case .idle:
-            Text("idle \(RelativeTimeFormatter.string(from: session.lastUpdatedAt))")
+            Text("\(currentLanguage.idleGroup) \(RelativeTimeFormatter.string(from: session.lastUpdatedAt))")
         case .dead:
             if let diedAt = session.diedAt {
-                Text("crashed \(RelativeTimeFormatter.string(from: diedAt))")
+                Text("\(currentLanguage.crashedGroup) \(RelativeTimeFormatter.string(from: diedAt))")
             } else {
-                Text("crashed")
+                Text(currentLanguage.crashedGroup)
             }
         }
     }

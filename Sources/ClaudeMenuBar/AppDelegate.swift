@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if let button = statusItem.button {
             button.action = #selector(togglePopover(_:))
             button.target = self
-            button.setAccessibilityLabel("NyanBar provider sessions")
+            button.setAccessibilityLabel(settings.selectedLanguage.providerSessionsAccessibilityLabel)
         }
 
         // Popover anchored to status item button
@@ -66,6 +66,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.contentViewController = NSHostingController(rootView: contentView)
 
         watcher.startWatching()
+        settings.$selectedLanguage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] language in
+                self?.statusItem.button?.setAccessibilityLabel(language.providerSessionsAccessibilityLabel)
+            }
+            .store(in: &cancellables)
         settings.$enabledProviders
             .dropFirst()
             .receive(on: DispatchQueue.main)

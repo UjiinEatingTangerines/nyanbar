@@ -59,6 +59,61 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self { case .korean: "충돌"; case .japanese: "クラッシュ"; case .english: "Crashed" }
     }
 
+    // MARK: - Provider Monitoring
+
+    var providerMonitoringTitle: String {
+        switch self { case .korean: "제공업체 모니터링"; case .japanese: "プロバイダーの監視"; case .english: "Provider monitoring" }
+    }
+    var providerMonitoringDescription: String {
+        switch self {
+        case .korean: "기본적으로 Claude만 활성화됩니다. 다른 도구는 직접 켜야 합니다. 실행 중은 로컬 프로세스가 있다는 뜻이며, AI가 작업 중이라는 뜻은 아닙니다. 사용량 API나 인증 정보는 읽지 않습니다."
+        case .japanese: "初期設定ではClaudeのみ有効です。他のツールは手動で有効にしてください。実行中はローカルプロセスの存在を示し、AIの作業中を意味しません。使用量APIや認証情報は読み取りません。"
+        case .english: "Only Claude is enabled by default. Other tools require opt-in. Running means a local process exists, not that AI is working. No usage APIs or credentials are read."
+        }
+    }
+    var runningTaskUnknown: String {
+        switch self { case .korean: "실행 중 · 작업 상태 알 수 없음"; case .japanese: "実行中 · タスク状態不明"; case .english: "Running · task state unknown" }
+    }
+    var providerSessionHint: String {
+        switch self {
+        case .korean: "설정에서 제공업체를 켠 뒤 로컬 도구를 실행하세요. 프로세스가 있다고 해서 작업 중인 것은 아닙니다."
+        case .japanese: "設定でプロバイダーを有効にして、ローカルツールを起動してください。プロセスの存在は作業中を意味しません。"
+        case .english: "Enable providers in Settings, then open a local tool. Process presence is not task activity."
+        }
+    }
+    var codexProfilesTitle: String {
+        switch self { case .korean: "Codex 홈 / 프로필 — 계정 확인 안 됨"; case .japanese: "Codexホーム / プロファイル — アカウント未確認"; case .english: "Codex homes / profiles — not verified accounts" }
+    }
+    var codexProfilesDescription: String {
+        switch self {
+        case .korean: "폴더가 발견되어도 세션이 실행 중이라는 뜻은 아닙니다. 프로세스가 열고 있는 세션 파일이나 실행 잠금 파일로 홈 폴더를 확인합니다. 근거가 없거나 서로 충돌하면 프로필을 알 수 없습니다."
+        case .japanese: "フォルダーの検出はセッションの実行中を意味しません。開いているセッションファイルまたは実行ロックからホームを確認します。証拠がない、または矛盾する場合はプロファイル不明です。"
+        case .english: "Directory discovery does not imply a running session. An open session file or runtime lock identifies its home. Missing or conflicting evidence leaves the profile unknown."
+        }
+    }
+    var noCodexHomes: String {
+        switch self { case .korean: "홈 폴더를 찾지 못했습니다."; case .japanese: "ホームフォルダーが見つかりません。"; case .english: "No home directories found." }
+    }
+    var refreshCodexHomes: String {
+        switch self { case .korean: "홈 폴더 새로고침"; case .japanese: "ホームフォルダーを更新"; case .english: "Refresh homes" }
+    }
+    var providerCatalogSource: String {
+        switch self { case .korean: "목록 출처: OpenUsage 공개 main (소스 스냅샷)"; case .japanese: "一覧の出典: OpenUsage公開main（ソーススナップショット）"; case .english: "Catalog: OpenUsage public main (source snapshot)" }
+    }
+    func codexProfileLabel(path: String?) -> String {
+        switch self {
+        case .korean: path.map { "홈/프로필: \($0) (계정 확인 안 됨)" } ?? "홈/프로필 알 수 없음 · 계정 확인 안 됨"
+        case .japanese: path.map { "ホーム/プロファイル: \($0)（アカウント未確認）" } ?? "ホーム/プロファイル不明 · アカウント未確認"
+        case .english: path.map { "Home/profile: \($0) (account unverified)" } ?? "Home/profile unknown · account unverified"
+        }
+    }
+    var dismissSession: String {
+        switch self { case .korean: "닫기"; case .japanese: "閉じる"; case .english: "Dismiss" }
+    }
+    var providerSessionsAccessibilityLabel: String {
+        switch self { case .korean: "NyanBar 제공업체 세션"; case .japanese: "NyanBarプロバイダーセッション"; case .english: "NyanBar provider sessions" }
+    }
+
     // MARK: - History
 
     var noHistory: String {
