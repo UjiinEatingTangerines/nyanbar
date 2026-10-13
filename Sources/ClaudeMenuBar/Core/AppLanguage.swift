@@ -62,11 +62,11 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     // MARK: - Provider Monitoring
 
     var providerMonitoringTitle: String {
-        switch self { case .korean: "제공업체 모니터링"; case .japanese: "プロバイダーの監視"; case .english: "Provider monitoring" }
+        switch self { case .korean: "연동 가능한 AI 도구"; case .japanese: "プロバイダーの監視"; case .english: "Provider monitoring" }
     }
     var providerMonitoringDescription: String {
         switch self {
-        case .korean: "기본적으로 Claude만 활성화됩니다. 다른 도구는 직접 켜야 합니다. 실행 중은 로컬 프로세스가 있다는 뜻이며, AI가 작업 중이라는 뜻은 아닙니다. 사용량 API나 인증 정보는 읽지 않습니다."
+        case .korean: "실행 여부를 감지할 도구를 선택하세요. 기본적으로 Claude만 활성화됩니다. 실행 중은 로컬 프로세스가 있다는 뜻이며, AI가 작업 중이라는 뜻은 아닙니다. 사용량 API나 인증 정보는 읽지 않습니다."
         case .japanese: "初期設定ではClaudeのみ有効です。他のツールは手動で有効にしてください。実行中はローカルプロセスの存在を示し、AIの作業中を意味しません。使用量APIや認証情報は読み取りません。"
         case .english: "Only Claude is enabled by default. Other tools require opt-in. Running means a local process exists, not that AI is working. No usage APIs or credentials are read."
         }
@@ -76,7 +76,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
     var providerSessionHint: String {
         switch self {
-        case .korean: "설정에서 제공업체를 켠 뒤 로컬 도구를 실행하세요. 프로세스가 있다고 해서 작업 중인 것은 아닙니다."
+        case .korean: "설정에서 AI 도구를 켠 뒤 해당 도구를 실행하세요. 프로세스가 있다고 해서 작업 중인 것은 아닙니다."
         case .japanese: "設定でプロバイダーを有効にして、ローカルツールを起動してください。プロセスの存在は作業中を意味しません。"
         case .english: "Enable providers in Settings, then open a local tool. Process presence is not task activity."
         }
